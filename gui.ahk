@@ -2,10 +2,16 @@
 
 global WC_GUI_IsReloadingProfiles := false
 global WC_GUI_IsSorting := false
-global WC_GUI_PendingSortWins := 0
-global WC_GUI_PendingSortProfiles := 0
-global WC_GUI_SortTimerArmedWins := false
-global WC_GUI_SortTimerArmedProfiles := false
+; ソート状態をターゲット別に管理（wins / profiles）
+global WC_GUI_SortState := Map(
+	"wins", Map("pending", 0, "armed", false, "lastCol", 0, "asc", true),
+	"profiles", Map("pending", 0, "armed", false, "lastCol", 0, "asc", true)
+)
+; SetTimer 用の関数参照を事前生成（毎回クロージャを作らないため）
+global _WC_ProcessSortFn := Map(
+	"wins", (*) => _ProcessPendingSort("wins"),
+	"profiles", (*) => _ProcessPendingSort("profiles")
+)
 
 OpenWindowControllerGui(wc, openProfilesFirst := false) {
 	static wcGui := 0
@@ -38,7 +44,7 @@ OpenWindowControllerGui(wc, openProfilesFirst := false) {
 	lvWins.ModifyCol(5, 80)
 	lvWins.ModifyCol(6, 200)
 	; 1列目ヘッダクリックでチェック状態ソート
-	lvWins.OnEvent("ColClick", (ctrl, col) => _OnWinsColClick(ctrl, col))
+	lvWins.OnEvent("ColClick", (ctrl, col) => _OnColClick(ctrl, col, "wins", 6, 5, false))
 
 	btnRefresh := wcGui.AddButton("xm y+8 w120", "更新")
 	btnRefresh.OnEvent("Click", (*) => _RefreshWindowList(wc, lvWins, txtStatus))
@@ -56,7 +62,7 @@ OpenWindowControllerGui(wc, openProfilesFirst := false) {
 	; ItemCheck は (Ctrl, Row, Checked?) のように情報が渡ってくるため、それを受け取る
 	lvProfiles.OnEvent("ItemCheck", (ctrl, row, checked := "") => _OnProfileItemCheck(wc, ctrl, txtStatus, row, checked))
 	; 1列目ヘッダクリックでチェック状態ソート
-	lvProfiles.OnEvent("ColClick", (ctrl, col) => _OnProfilesColClick(ctrl, col))
+	lvProfiles.OnEvent("ColClick", (ctrl, col) => _OnColClick(ctrl, col, "profiles", 3, 2, true))
 
 	btnApply := wcGui.AddButton("xm y+8 w180", "適用（配置のみ）")
 	btnApply.OnEvent("Click", (*) => _ApplySelectedProfile(wc, lvProfiles, false, txtStatus))
@@ -242,56 +248,28 @@ _ApplyProfileCheckState(wc, lvProfiles, row, name, txtStatus, checked := "") {
 	}
 }
 
-_OnProfilesColClick(lvProfiles, col) {
-	global WC_GUI_IsReloadingProfiles
-	global WC_GUI_IsSorting
-	global WC_GUI_PendingSortProfiles
-	global WC_GUI_SortTimerArmedProfiles
-	static lastCol := 0
-	static asc := true
-	if (lastCol = col)
-		asc := !asc
-	else
-		asc := true
-	lastCol := col
-	; NOTE: 速いクリックでも取りこぼさないよう、要求を保留してタイマーでまとめて処理する
-	WC_GUI_PendingSortProfiles := Map(
-		"lv", lvProfiles,
-		"columnCount", 3,
-		"keyCol", 2,
-		"sortCol", col,
-		"asc", asc,
-		"suppressProfileEvents", true
-	)
-	if !WC_GUI_SortTimerArmedProfiles {
-		WC_GUI_SortTimerArmedProfiles := true
-		SetTimer(_ProcessPendingSortProfiles, -1)
-	}
-}
+; --- ソートロジック（wins / profiles 共通） ---
 
-_OnWinsColClick(lvWins, col) {
-	global WC_GUI_IsSorting
-	global WC_GUI_PendingSortWins
-	global WC_GUI_SortTimerArmedWins
-	static lastCol := 0
-	static asc := true
-	if (lastCol = col)
-		asc := !asc
+_OnColClick(lv, col, target, columnCount, keyCol, suppressProfileEvents) {
+	global WC_GUI_SortState, _WC_ProcessSortFn
+	st := WC_GUI_SortState[target]
+	if (st["lastCol"] = col)
+		st["asc"] := !st["asc"]
 	else
-		asc := true
-	lastCol := col
+		st["asc"] := true
+	st["lastCol"] := col
 	; NOTE: 速いクリックでも取りこぼさないよう、要求を保留してタイマーでまとめて処理する
-	WC_GUI_PendingSortWins := Map(
-		"lv", lvWins,
-		"columnCount", 6,
-		"keyCol", 5,
+	st["pending"] := Map(
+		"lv", lv,
+		"columnCount", columnCount,
+		"keyCol", keyCol,
 		"sortCol", col,
-		"asc", asc,
-		"suppressProfileEvents", false
+		"asc", st["asc"],
+		"suppressProfileEvents", suppressProfileEvents
 	)
-	if !WC_GUI_SortTimerArmedWins {
-		WC_GUI_SortTimerArmedWins := true
-		SetTimer(_ProcessPendingSortWins, -1)
+	if !st["armed"] {
+		st["armed"] := true
+		SetTimer(_WC_ProcessSortFn[target], -1)
 	}
 }
 
@@ -317,47 +295,25 @@ _SortListViewByColumn_Safe(lv, columnCount, keyCol, sortCol, asc, suppressProfil
 	}
 }
 
-_ProcessPendingSortWins() {
-	global WC_GUI_PendingSortWins
-	global WC_GUI_SortTimerArmedWins
-	global WC_GUI_IsSorting
-	WC_GUI_SortTimerArmedWins := false
-	if !WC_GUI_PendingSortWins
+_ProcessPendingSort(target) {
+	global WC_GUI_IsSorting, WC_GUI_SortState, _WC_ProcessSortFn
+	st := WC_GUI_SortState[target]
+	st["armed"] := false
+	if !st["pending"]
 		return
 	if WC_GUI_IsSorting {
 		; ソート中に要求が来た場合は、終わってからもう一度
-		WC_GUI_SortTimerArmedWins := true
-		SetTimer(_ProcessPendingSortWins, -1)
+		st["armed"] := true
+		SetTimer(_WC_ProcessSortFn[target], -1)
 		return
 	}
-	req := WC_GUI_PendingSortWins
-	WC_GUI_PendingSortWins := 0
+	req := st["pending"]
+	st["pending"] := 0
 	_SortListViewByColumn_Safe(req["lv"], req["columnCount"], req["keyCol"], req["sortCol"], req["asc"], req["suppressProfileEvents"])
 	; 実行中に新しい要求が入っていたら、もう一度回す
-	if WC_GUI_PendingSortWins {
-		WC_GUI_SortTimerArmedWins := true
-		SetTimer(_ProcessPendingSortWins, -1)
-	}
-}
-
-_ProcessPendingSortProfiles() {
-	global WC_GUI_PendingSortProfiles
-	global WC_GUI_SortTimerArmedProfiles
-	global WC_GUI_IsSorting
-	WC_GUI_SortTimerArmedProfiles := false
-	if !WC_GUI_PendingSortProfiles
-		return
-	if WC_GUI_IsSorting {
-		WC_GUI_SortTimerArmedProfiles := true
-		SetTimer(_ProcessPendingSortProfiles, -1)
-		return
-	}
-	req := WC_GUI_PendingSortProfiles
-	WC_GUI_PendingSortProfiles := 0
-	_SortListViewByColumn_Safe(req["lv"], req["columnCount"], req["keyCol"], req["sortCol"], req["asc"], req["suppressProfileEvents"])
-	if WC_GUI_PendingSortProfiles {
-		WC_GUI_SortTimerArmedProfiles := true
-		SetTimer(_ProcessPendingSortProfiles, -1)
+	if st["pending"] {
+		st["armed"] := true
+		SetTimer(_WC_ProcessSortFn[target], -1)
 	}
 }
 
@@ -451,59 +407,6 @@ _StableInsertionSort(arr, cmpFn) {
 	}
 }
 
-
-_SortListViewByCheckedState(lv, columnCount, keyCol, asc := true) {
-	; チェック状態(true/false)で手動ソートする（ネイティブチェックボックスの見た目は維持）
-	selectedRow := lv.GetNext(0, "Focused")
-	if !selectedRow
-		selectedRow := lv.GetNext(0)
-	selectedKey := ""
-	if selectedRow
-		try selectedKey := lv.GetText(selectedRow, keyCol)
-
-	unchecked := []
-	checked := []
-	Loop lv.GetCount() {
-		r := A_Index
-		data := []
-		Loop columnCount {
-			data.Push(lv.GetText(r, A_Index))
-		}
-		isChecked := (lv.GetNext(r - 1, "Checked") = r)
-		item := Map("checked", isChecked, "data", data)
-		if isChecked
-			checked.Push(item)
-		else
-			unchecked.Push(item)
-	}
-
-	lv.Delete()
-	if asc {
-		_SortListViewByCheckedState_AddGroup(lv, unchecked)
-		_SortListViewByCheckedState_AddGroup(lv, checked)
-	} else {
-		_SortListViewByCheckedState_AddGroup(lv, checked)
-		_SortListViewByCheckedState_AddGroup(lv, unchecked)
-	}
-
-	if (selectedKey != "") {
-		Loop lv.GetCount() {
-			r := A_Index
-			if (lv.GetText(r, keyCol) = selectedKey) {
-				lv.Modify(r, "Select Focus Vis")
-				break
-			}
-		}
-	}
-}
-
-_SortListViewByCheckedState_AddGroup(lv, group) {
-	for it in group {
-		newRow := lv.Add(, it["data"]*)
-		if it["checked"]
-			lv.Modify(newRow, "Check")
-	}
-}
 
 _ToggleSync(wc, chkSync, txtStatus) {
 	try {
