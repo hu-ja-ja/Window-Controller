@@ -243,6 +243,11 @@ class WindowController {
 		this.StartHooksIfEnabled()
 	}
 
+	SetShowGuiOnStartup(enabled) {
+		this.Config["settings"]["showGuiOnStartup"] := !!enabled
+		this.SaveConfig()
+	}
+
 	StartHooksIfEnabled() {
 		if this.Config["settings"]["syncMinMax"] && this._HasAnySyncProfile()
 			this._EnsureHooks()

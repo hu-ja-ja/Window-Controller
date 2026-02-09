@@ -19,6 +19,7 @@ OpenWindowControllerGui(wc, openProfilesFirst := false) {
 	static lvProfiles := 0
 	static edtName := 0
 	static chkSync := 0
+	static chkShowGuiOnStartup := 0
 	static txtStatus := 0
 	static btnApply := 0
 	static btnLaunchApply := 0
@@ -77,6 +78,10 @@ OpenWindowControllerGui(wc, openProfilesFirst := false) {
 	chkSync := wcGui.AddCheckBox("xm y+10", "連動機能を有効にする（全体）")
 	chkSync.Value := wc.Config["settings"]["syncMinMax"] ? 1 : 0
 	chkSync.OnEvent("Click", (*) => _ToggleSync(wc, chkSync, txtStatus))
+
+	chkShowGuiOnStartup := wcGui.AddCheckBox("x+16 yp", "起動時にGUIを表示する（OFF=タスクトレイ常駐のみ）")
+	chkShowGuiOnStartup.Value := wc.Config["settings"]["showGuiOnStartup"] ? 1 : 0
+	chkShowGuiOnStartup.OnEvent("Click", (*) => _ToggleShowGuiOnStartup(wc, chkShowGuiOnStartup, txtStatus))
 
 	txtStatus := wcGui.AddText("xm y+10 w920", "")
 
@@ -415,6 +420,16 @@ _ToggleSync(wc, chkSync, txtStatus) {
 		txtStatus.Text := "連動設定: " (chkSync.Value = 1 ? "ON" : "OFF")
 	} catch as ex {
 		wc.Log("Toggle sync failed: " ex.Message)
+		txtStatus.Text := "設定変更に失敗: " ex.Message
+	}
+}
+
+_ToggleShowGuiOnStartup(wc, chkShowGuiOnStartup, txtStatus) {
+	try {
+		wc.SetShowGuiOnStartup(chkShowGuiOnStartup.Value = 1)
+		txtStatus.Text := "起動時GUI表示: " (chkShowGuiOnStartup.Value = 1 ? "ON" : "OFF")
+	} catch as ex {
+		wc.Log("Toggle showGuiOnStartup failed: " ex.Message)
 		txtStatus.Text := "設定変更に失敗: " ex.Message
 	}
 }
