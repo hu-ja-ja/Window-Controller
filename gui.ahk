@@ -36,15 +36,16 @@ OpenWindowControllerGui(wc, openProfilesFirst := false) {
 	colCheckW := Max(22, Round(22 * (A_ScreenDPI / 96)))
 
 	wcGui.AddText("xm ym", "起動中ウィンドウ（チェックしてプロファイル保存）")
-	lvWins := wcGui.AddListView("xm w920 r18 Checked", ["", "Title", "Exe", "Class", "HWND", "URL"])
+	lvWins := wcGui.AddListView("xm w1060 r18 Checked", ["", "Title", "Exe", "Class", "HWND", "URL", "Profile"])
 	lvWins.ModifyCol(1, colCheckW)
-	lvWins.ModifyCol(2, 320)
-	lvWins.ModifyCol(3, 120)
-	lvWins.ModifyCol(4, 140)
+	lvWins.ModifyCol(2, 280)
+	lvWins.ModifyCol(3, 110)
+	lvWins.ModifyCol(4, 120)
 	lvWins.ModifyCol(5, 80)
 	lvWins.ModifyCol(6, 200)
+	lvWins.ModifyCol(7, 100)
 	; 1列目ヘッダクリックでチェック状態ソート
-	lvWins.OnEvent("ColClick", (ctrl, col) => _OnColClick(ctrl, col, "wins", 6, 5, false))
+	lvWins.OnEvent("ColClick", (ctrl, col) => _OnColClick(ctrl, col, "wins", 7, 5, false))
 
 	btnRefresh := wcGui.AddButton("xm y+8 w120", "更新")
 	btnRefresh.OnEvent("Click", (*) => _RefreshWindowList(wc, lvWins, txtStatus))
@@ -96,7 +97,7 @@ _RefreshWindowList(wc, lv, txtStatus) {
 		lv.Delete()
 		wins := wc.EnumerateWindows()
 		for w in wins {
-			lv.Add(, "", w["title"], w["exe"], w["class"], w["hwnd"], w["url"])
+			lv.Add(, "", w["title"], w["exe"], w["class"], w["hwnd"], w["url"], w["browserProfile"])
 		}
 		txtStatus.Text := "ウィンドウ一覧を更新しました（" wins.Length "件）"
 	} catch as ex {

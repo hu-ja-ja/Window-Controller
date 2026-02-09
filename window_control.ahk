@@ -38,6 +38,20 @@ class WindowController {
 		this._lastForegroundTickByProfile := Map() ; profileName -> tick
 		this._suppressForegroundSync := false
 		this._suppressHookEvents := false
+		this._isShuttingDown := false
+	}
+
+	__Delete() {
+		; 終了時のWinEventコールバックで例外が連打されないよう、確実にフックを外す
+		try this.Shutdown()
+	}
+
+	Shutdown() {
+		; 先に抑止を立ててからフック解除（解除中にイベントが飛んでも安全にreturnできる）
+		this._isShuttingDown := true
+		this._suppressHookEvents := true
+		this._suppressForegroundSync := true
+		this._RemoveHooks()
 	}
 
 	_HasAnySyncProfile() {
@@ -301,56 +315,67 @@ class WindowController {
 	}
 
 	_OnWinEvent(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime) {
-		if (idObject != 0) || (idChild != 0)
-			return
-		if !hwnd
-			return
-		if !this.Config["settings"]["syncMinMax"]
-			return
-		if !this._HasAnySyncProfile()
-			return
-		if this._suppressHookEvents
-			return
-		if this._isPropagating
-			return
-
-		if (event = WindowController.EVENT_SYSTEM_FOREGROUND) {
-			if this._suppressForegroundSync
-				return
-			this._OnForegroundEvent(hwnd)
-			return
-		}
-
-		mm := 0
-		try mm := WinGetMinMax("ahk_id " hwnd)
-		catch {
-			return
-		}
-		hwndKey := String(hwnd)
-		if this._lastMinMaxByHwnd.Has(hwndKey) {
-			if (this._lastMinMaxByHwnd[hwndKey] = mm)
-				return
-		}
-		this._lastMinMaxByHwnd[hwndKey] := mm
-
-		groups := this._GetSyncGroupsContainingHwnd(hwndKey)
-		if (groups.Length = 0) {
-			; HWNDが変わった/ウィンドウが作り直された場合に追随
-			if (A_TickCount - this._lastSyncGroupRebuildTick) > 1200 {
-				this.RebuildSyncGroups()
-				groups := this._GetSyncGroupsContainingHwnd(hwndKey)
-			}
-		}
-		if (groups.Length = 0)
-			return
-
-		this._isPropagating := true
 		try {
-			for g in groups {
-				this._PropagateMinMaxWithinGroup(g, hwnd, mm)
+			if this._isShuttingDown
+				return
+			if (idObject != 0) || (idChild != 0)
+				return
+			if !hwnd
+				return
+			if !this.Config["settings"]["syncMinMax"]
+				return
+			if !this._HasAnySyncProfile()
+				return
+			if this._suppressHookEvents
+				return
+			if this._isPropagating
+				return
+
+			if (event = WindowController.EVENT_SYSTEM_FOREGROUND) {
+				if this._suppressForegroundSync
+					return
+				this._OnForegroundEvent(hwnd)
+				return
 			}
-		} finally {
-			this._isPropagating := false
+
+			mm := 0
+			try mm := WinGetMinMax("ahk_id " hwnd)
+			catch {
+				return
+			}
+			hwndKey := String(hwnd)
+			if this._lastMinMaxByHwnd.Has(hwndKey) {
+				if (this._lastMinMaxByHwnd[hwndKey] = mm)
+					return
+			}
+			this._lastMinMaxByHwnd[hwndKey] := mm
+
+			groups := this._GetSyncGroupsContainingHwnd(hwndKey)
+			if (groups.Length = 0) {
+				; HWNDが変わった/ウィンドウが作り直された場合に追随
+				if (A_TickCount - this._lastSyncGroupRebuildTick) > 1200 {
+					this.RebuildSyncGroups()
+					groups := this._GetSyncGroupsContainingHwnd(hwndKey)
+				}
+			}
+			if (groups.Length = 0)
+				return
+
+			this._isPropagating := true
+			try {
+				for g in groups {
+					this._PropagateMinMaxWithinGroup(g, hwnd, mm)
+				}
+			} finally {
+				this._isPropagating := false
+			}
+		} catch as ex {
+			; WinEventコールバック内の例外は未処理だとダイアログ連打になるため、握りつぶす
+			try {
+				if !this._isShuttingDown
+					this.Log("OnWinEvent error: " ex.Message)
+			}
+			return
 		}
 	}
 
@@ -540,19 +565,147 @@ class WindowController {
 				url := ""
 				try url := this.TryGetBrowserUrl(hwnd, exe, false)
 
+				; ブラウザ識別情報（プロファイル等）
+				browserInfo := ""
+				exeLower := StrLower(exe)
+				if (this._IsBrowserExe(exeLower) != "") {
+					try {
+						pid := WinGetPID("ahk_id " hwnd)
+						if pid {
+							cmd := this._GetProcessCommandLine(pid)
+							bident := this._ExtractBrowserIdentity(exeLower, cmd)
+							if (bident is Map) && (bident.Count > 0) {
+								; GUI表示用に要約
+								parts := []
+								if bident.Has("profileDirectory")
+									parts.Push(bident["profileDirectory"])
+								else if bident.Has("profileName")
+									parts.Push(bident["profileName"])
+								else if bident.Has("profileDir")
+									parts.Push(bident["profileDir"])
+								if (parts.Length > 0)
+									browserInfo := parts[1]
+							}
+						}
+					}
+				}
+
 				wins.Push(Map(
 					"hwnd", hwnd,
 					"title", title,
 					"exe", exe,
 					"class", cls,
 					"path", path,
-					"url", url
+					"url", url,
+					"browserProfile", browserInfo
 				))
 			} catch as ex {
 				this.Log("EnumerateWindows item failed: " ex.Message)
 			}
 		}
 		return wins
+	}
+
+	; ---- URL正規化・ブラウザ識別ヘルパ群 ----
+
+	_NormalizeUrlForMatch(url) {
+		try url := Trim(String(url))
+		catch
+			return ""
+		if (url = "")
+			return ""
+		url := RegExReplace(url, "\s+", " ")
+		; query / fragment は揺れやすいので除去
+		url := RegExReplace(url, "[#?].*$", "")
+		; scheme://host/path を抽出
+		if RegExMatch(url, "i)^(https?|ws|wss|ftp)://([^/]+)(/.*)?$", &m) {
+			scheme := StrLower(m[1])
+			host := StrLower(m[2])
+			path := m[3] ? m[3] : "/"
+			return scheme "://" host path
+		}
+		if RegExMatch(url, "i)^(about:[^ ]+)", &m2)
+			return StrLower(m2[1])
+		if RegExMatch(url, "i)^file:/{0,3}(.+)$", &m3)
+			return "file:" StrLower(m3[1])
+		return StrLower(url)
+	}
+
+	_GetUrlHost(urlKey) {
+		if (urlKey = "")
+			return ""
+		if RegExMatch(urlKey, "i)^(https?|ws|wss|ftp)://([^/]+)", &m)
+			return StrLower(m[2])
+		return ""
+	}
+
+	_GetProcessCommandLine(pid) {
+		try {
+			wmi := ComObjGet("winmgmts:")
+			q := wmi.ExecQuery("Select CommandLine from Win32_Process where ProcessId=" pid)
+			for p in q {
+				try return String(p.CommandLine)
+			}
+		} catch {
+		}
+		return ""
+	}
+
+	_TryGetCmdArg(cmd, keyPattern) {
+		if (cmd = "")
+			return ""
+		; = 形式: --key="value" or --key=value
+		if RegExMatch(cmd, "i)(?:^|\s)(" keyPattern ")=(`"[^`"]+`"|\S+)", &m) {
+			val := m[2]
+			return Trim(val, '`"')
+		}
+		; 空白区切り: --key "value" or --key value
+		if RegExMatch(cmd, "i)(?:^|\s)(" keyPattern ")\s+(`"[^`"]+`"|\S+)", &m2) {
+			val := m2[2]
+			return Trim(val, '`"')
+		}
+		return ""
+	}
+
+	_IsBrowserExe(exeLower) {
+		switch exeLower {
+			case "chrome.exe", "msedge.exe", "brave.exe", "vivaldi.exe":
+				return "chromium"
+			case "firefox.exe", "floorp.exe":
+				return "firefox"
+			default:
+				return ""
+		}
+	}
+
+	_ExtractBrowserIdentity(exeLower, cmdLine) {
+		ident := Map()
+		if (cmdLine = "")
+			return ident
+		kind := this._IsBrowserExe(exeLower)
+		if (kind = "chromium") {
+			ud := this._TryGetCmdArg(cmdLine, "--user-data-dir")
+			pd := this._TryGetCmdArg(cmdLine, "--profile-directory")
+			if (ud != "")
+				ident["userDataDir"] := this._NormalizeWindowsPath(ud)
+			if (pd != "")
+				ident["profileDirectory"] := pd
+			if (ident.Count > 0)
+				ident["kind"] := "chromium"
+			return ident
+		}
+		if (kind = "firefox") {
+			profDir := this._TryGetCmdArg(cmdLine, "-profile")
+			profName := this._TryGetCmdArg(cmdLine, "-P")
+			if (profDir != "")
+				ident["profileDir"] := this._NormalizeWindowsPath(profDir)
+			if (profName != "")
+				ident["profileName"] := profName
+			if (ident.Count > 0)
+				ident["kind"] := "firefox"
+			return ident
+		}
+		return ident
 	}
 
 	TryGetBrowserUrl(hwnd, exe, allowIntrusive := false, batchCtx := 0) {
@@ -683,6 +836,23 @@ class WindowController {
 				url := ""
 				try url := this.TryGetBrowserUrl(hwnd, exe, true, batchCtx)
 
+				; URL正規化キー
+				urlKey := ""
+				try urlKey := this._NormalizeUrlForMatch(url)
+
+				; ブラウザ識別情報（プロファイル等）
+				bident := Map()
+				exeLower := StrLower(exe)
+				if (this._IsBrowserExe(exeLower) != "") {
+					try {
+						pid := WinGetPID("ahk_id " hwnd)
+						if pid {
+							cmd := this._GetProcessCommandLine(pid)
+							bident := this._ExtractBrowserIdentity(exeLower, cmd)
+						}
+					}
+				}
+
 				x := y := w := h := 0
 				WinGetPos(&x, &y, &w, &h, "ahk_id " hwnd)
 				mm := WinGetMinMax("ahk_id " hwnd)
@@ -696,13 +866,18 @@ class WindowController {
 					}
 				}
 
+				matchMap := Map(
+					"exe", exe,
+					"class", cls,
+					"title", title,
+					"url", url,
+					"urlKey", urlKey
+				)
+				if (bident is Map) && (bident.Count > 0)
+					matchMap["browser"] := bident
+
 				entry := Map(
-					"match", Map(
-						"exe", exe,
-						"class", cls,
-						"title", title,
-						"url", url
-					),
+					"match", matchMap,
 					"path", path,
 					"rect", Map("x", x, "y", y, "w", w, "h", h),
 					"minMax", mm
@@ -800,7 +975,7 @@ class WindowController {
 
 		for entry in entries {
 			try {
-				hwnd := this._FindWindowForEntry(entry)
+				hwnd := this._FindWindowForEntry(entry, true)
 				if (!hwnd || !WinExist("ahk_id " hwnd)) {
 					if launchMissing
 						hwnd := this._LaunchAndWait(entry)
@@ -871,7 +1046,7 @@ class WindowController {
 		return (actual = expected)
 	}
 
-	_FindWindowForEntry(entry) {
+	_FindWindowForEntry(entry, allowIntrusive := false) {
 		if !(entry is Map)
 			return 0
 		if !entry.Has("match") || !(entry["match"] is Map)
@@ -879,11 +1054,19 @@ class WindowController {
 		m := entry["match"]
 		exe := m.Has("exe") ? m["exe"] : ""
 		cls := m.Has("class") ? m["class"] : ""
-		title := m.Has("title") ? m["title"] : ""
+		wantTitle := m.Has("title") ? m["title"] : ""
 		wantPath := entry.Has("path") ? entry["path"] : ""
+		; urlKey があればそれを使い、無ければ url から正規化（旧データ互換）
+		wantUrlKey := m.Has("urlKey") ? m["urlKey"] : (m.Has("url") ? this._NormalizeUrlForMatch(m["url"]) : "")
+		wantHost := this._GetUrlHost(wantUrlKey)
+		wantBrowser := (m.Has("browser") && (m["browser"] is Map)) ? m["browser"] : 0
 		if (exe = "")
 			return 0
 
+		exeLower := StrLower(exe)
+		browserKind := this._IsBrowserExe(exeLower)
+
+		; Phase 1: exe + class で候補抽出（必須条件）
 		candidates := []
 		try {
 			hwnds := WinGetList("ahk_exe " exe)
@@ -905,37 +1088,118 @@ class WindowController {
 		}
 		if (candidates.Length = 0)
 			return 0
+		if (candidates.Length = 1)
+			return candidates[1]
 
-		if (wantPath != "") {
-			pathMatched := []
-			for hwnd in candidates {
+		; Phase 2: 各候補に非侵襲でスコア加点
+		bestHwnd := candidates[1]
+		bestScore := -999999
+		scoreByHwnd := Map()
+
+		for hwnd in candidates {
+			score := 0
+
+			; path 一致（強い）
+			if (wantPath != "") {
 				try {
 					p := WinGetProcessPath("ahk_id " hwnd)
 					if (StrLower(p) = StrLower(wantPath))
-						pathMatched.Push(hwnd)
+						score += 60
 				}
 			}
-			if (pathMatched.Length > 0)
-				candidates := pathMatched
+
+			; title 一致
+			if (wantTitle != "") {
+				try {
+					t := WinGetTitle("ahk_id " hwnd)
+					if (t = wantTitle)
+						score += 30
+					else if InStr(t, wantTitle)
+						score += 10
+				}
+			}
+
+			; ブラウザ識別情報（プロファイル等）一致
+			if (wantBrowser is Map) {
+				try {
+					pid := WinGetPID("ahk_id " hwnd)
+					cmd := ""
+					if pid
+						cmd := this._GetProcessCommandLine(pid)
+					candIdent := this._ExtractBrowserIdentity(exeLower, cmd)
+					; Chromium 系
+					if wantBrowser.Has("userDataDir") && candIdent.Has("userDataDir") {
+						if (StrLower(wantBrowser["userDataDir"]) = StrLower(candIdent["userDataDir"]))
+							score += 70
+					}
+					if wantBrowser.Has("profileDirectory") && candIdent.Has("profileDirectory") {
+						if (wantBrowser["profileDirectory"] = candIdent["profileDirectory"])
+							score += 50
+					}
+					; Firefox 系
+					if wantBrowser.Has("profileDir") && candIdent.Has("profileDir") {
+						if (StrLower(wantBrowser["profileDir"]) = StrLower(candIdent["profileDir"]))
+							score += 70
+					}
+					if wantBrowser.Has("profileName") && candIdent.Has("profileName") {
+						if (wantBrowser["profileName"] = candIdent["profileName"])
+							score += 50
+					}
+				}
+			}
+
+			; URL 一致（Chromium は非侵襲で取れる）
+			if (wantUrlKey != "") && (browserKind = "chromium") {
+				try {
+					u := this.TryGetBrowserUrl(hwnd, exe, false)
+					uk := this._NormalizeUrlForMatch(u)
+					if (uk != "") {
+						if (uk = wantUrlKey)
+							score += 60
+						else if (wantHost != "") && (this._GetUrlHost(uk) = wantHost)
+							score += 20
+					}
+				}
+			}
+
+			; アクティブウィンドウ優先（微弱なタイブレーカ）
+			try {
+				if (WinGetID("A") = hwnd)
+					score += 5
+			}
+
+			scoreByHwnd[String(hwnd)] := score
+			if (score > bestScore) {
+				bestScore := score
+				bestHwnd := hwnd
+			}
 		}
 
-		if (title != "") {
+		; Phase 3: Firefox/Floorp — 明示的な適用操作時のみ、urlKey があり上位が拮抗している場合に侵襲的URL照合
+		if allowIntrusive && (browserKind = "firefox") && (wantUrlKey != "") {
+			near := []
 			for hwnd in candidates {
-				try {
-					t := WinGetTitle("ahk_id " hwnd)
-					if (t = title)
-						return hwnd
-				}
+				s := scoreByHwnd.Has(String(hwnd)) ? scoreByHwnd[String(hwnd)] : 0
+				if (s >= bestScore - 5)
+					near.Push(hwnd)
 			}
-			for hwnd in candidates {
-				try {
-					t := WinGetTitle("ahk_id " hwnd)
-					if InStr(t, title)
-						return hwnd
+			if (near.Length > 1) {
+				for hwnd in near {
+					try {
+						u := this.TryGetBrowserUrl(hwnd, exe, true)
+						uk := this._NormalizeUrlForMatch(u)
+						if (uk != "") {
+							if (uk = wantUrlKey)
+								return hwnd
+							if (wantHost != "") && (this._GetUrlHost(uk) = wantHost)
+								bestHwnd := hwnd
+						}
+					}
 				}
 			}
 		}
-		return candidates[1]
+
+		return bestHwnd
 	}
 
 	_LaunchAndWait(entry) {

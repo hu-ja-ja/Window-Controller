@@ -29,6 +29,11 @@ WC_OnUnhandledError(ex, mode) {
 }
 
 WC_OnExit(exitReason, exitCode) {
+	global WC
+	; 終了中にWinEventフックが動き続けると例外ダイアログが連打されるため、先に解除する
+	try {
+		try WC.Shutdown()
+	}
 	try {
 		stamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
 		msg := "[" stamp "] OnExit reason=" exitReason " code=" exitCode "`n"
