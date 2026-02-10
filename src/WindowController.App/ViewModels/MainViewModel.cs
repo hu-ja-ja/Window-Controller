@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -377,6 +378,20 @@ public partial class MainViewModel : ObservableObject
         }
 
         var name = SelectedProfile.Name;
+
+        var result = MessageBox.Show(
+            $"プロファイル『{name}』を削除しますか？",
+            "Window-Controller",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            StatusText = "削除をキャンセルしました。";
+            return;
+        }
+
         if (_store.DeleteProfile(name))
         {
             ReloadProfiles();

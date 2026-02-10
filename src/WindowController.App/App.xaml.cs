@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Interop;
 using Hardcodet.Wpf.TaskbarNotification;
 using Serilog;
+using Wpf.Ui.Appearance;
 using WindowController.App.ViewModels;
 using WindowController.Browser;
 using WindowController.Core;
@@ -86,6 +87,14 @@ public partial class App : Application
             // Create main window
             _mainWindow = new MainWindow();
             _mainWindow.DataContext = _viewModel;
+
+            // Apply WPF-UI theme (follow system dark/light)
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark, Wpf.Ui.Controls.WindowBackdropType.Mica);
+
+            // Accent color (水色)
+            var appTheme = ApplicationThemeManager.GetAppTheme();
+            ApplicationAccentColorManager.Apply(System.Windows.Media.Color.FromRgb(0, 153, 255), appTheme, false, false);
+            SystemThemeWatcher.Watch(_mainWindow);
 
             // Setup tray icon
             SetupTrayIcon();
