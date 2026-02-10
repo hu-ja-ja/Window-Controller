@@ -33,7 +33,8 @@ public partial class App : Application
                 Directory.CreateDirectory(configDir);
 
             var logPath = Path.Combine(configDir, "window-controller.log");
-            var profilesPath = Path.Combine(configDir, "profiles.json");
+            var defaultProfilesPath = Path.Combine(configDir, "profiles.json");
+            var appSettingsPath = Path.Combine(configDir, "appsettings.json");
 
             // Setup Serilog
             Log.Logger = new LoggerConfiguration()
@@ -46,6 +47,13 @@ public partial class App : Application
             _log = Log.Logger;
             _log.Information("Window-Controller starting");
 
+            // Load app-level settings (profiles path etc.)
+            var appSettings = new AppSettingsStore(appSettingsPath, defaultProfilesPath, _log);
+            appSettings.Load();
+
+            var profilesPath = appSettings.EffectiveProfilesPath;
+            _log.Information("Profiles path: {Path}", profilesPath);
+
             // Core services
             var store = new ProfileStore(profilesPath, _log);
             store.Load();
@@ -56,7 +64,7 @@ public partial class App : Application
             var hookManager = new WinEventHookManager(_log);
             _syncManager = new SyncManager(store, enumerator, hookManager, _log);
 
-            _viewModel = new MainViewModel(store, enumerator, arranger, urlRetriever, _syncManager, _log);
+            _viewModel = new MainViewModel(store, enumerator, arranger, urlRetriever, _syncManager, appSettings, _log);
             _viewModel.Initialize();
 
             // Start sync hooks if enabled

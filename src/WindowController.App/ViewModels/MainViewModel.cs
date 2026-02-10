@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 using Serilog;
 using WindowController.Browser;
 using WindowController.Core;
@@ -40,6 +41,7 @@ public partial class MainViewModel : ObservableObject
     private readonly WindowArranger _arranger;
     private readonly BrowserUrlRetriever _urlRetriever;
     private readonly SyncManager _syncManager;
+    private readonly AppSettingsStore _appSettings;
     private readonly ILogger _log;
 
     [ObservableProperty] private string _statusText = "";
@@ -47,32 +49,36 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _syncEnabled;
     [ObservableProperty] private bool _showGuiOnStartup;
     [ObservableProperty] private ProfileItem? _selectedProfile;
+    [ObservableProperty] private string _profilesPathDisplay = "";
 
     public ObservableCollection<WindowItem> Windows { get; } = new();
     public ObservableCollection<ProfileItem> Profiles { get; } = new();
 
     public MainViewModel(ProfileStore store, WindowEnumerator enumerator,
         WindowArranger arranger, BrowserUrlRetriever urlRetriever,
-        SyncManager syncManager, ILogger log)
+        SyncManager syncManager, AppSettingsStore appSettings, ILogger log)
     {
         _store = store;
         _enumerator = enumerator;
         _arranger = arranger;
         _urlRetriever = urlRetriever;
         _syncManager = syncManager;
+        _appSettings = appSettings;
         _log = log;
 
         SyncEnabled = _store.Data.Settings.SyncMinMax != 0;
         ShowGuiOnStartup = _store.Data.Settings.ShowGuiOnStartup != 0;
+        ProfilesPathDisplay = _store.FilePath;
     }
 
     [RelayCommand]
-    private void RefreshWindows()
+    private async Task RefreshWindowsAsync()
     {
         try
         {
+            StatusText = "ウィンドウ一覧を取得中…";
+            var wins = await Task.Run(() => _enumerator.EnumerateWindows());
             Windows.Clear();
-            var wins = _enumerator.EnumerateWindows();
             foreach (var w in wins)
             {
                 Windows.Add(new WindowItem
@@ -148,7 +154,7 @@ public partial class MainViewModel : ObservableObject
 
             _store.SaveProfile(profile);
             ReloadProfiles();
-            _syncManager.RebuildGroups();
+            _syncManager.ScheduleRebuild();
             StatusText = $"保存しました: {name}";
         }
         catch (Exception ex)
@@ -293,7 +299,7 @@ public partial class MainViewModel : ObservableObject
             if (failures.Count > 0)
                 msg += $"（失敗 {failures.Count}件: {string.Join(", ", failures.Take(3))}）";
             StatusText = msg;
-            _syncManager.RebuildGroups();
+            _syncManager.ScheduleRebuild();
         }
         catch (Exception ex)
         {
@@ -374,7 +380,7 @@ public partial class MainViewModel : ObservableObject
         if (_store.DeleteProfile(name))
         {
             ReloadProfiles();
-            _syncManager.RebuildGroups();
+            _syncManager.ScheduleRebuild();
             StatusText = $"削除しました: {name}";
         }
         else
@@ -410,7 +416,7 @@ public partial class MainViewModel : ObservableObject
         {
             profile.SyncMinMax = pi.SyncMinMax ? 1 : 0;
             _store.SaveProfile(profile);
-            _syncManager.RebuildGroups();
+            // UpdateHooksIfNeeded already schedules a rebuild internally
             _syncManager.UpdateHooksIfNeeded();
             StatusText = $"連動設定({pi.Name}): {(pi.SyncMinMax ? "ON" : "OFF")}";
         }
@@ -433,7 +439,79 @@ public partial class MainViewModel : ObservableObject
 
     public void Initialize()
     {
-        RefreshWindows();
         ReloadProfiles();
+        // Kick off async refresh (fire-and-forget on UI thread)
+        _ = RefreshWindowsCommand.ExecuteAsync(null);
+    }
+
+    [RelayCommand]
+    private void BrowseProfilesPath()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "profiles.json の保存先を選択",
+            Filter = "JSONファイル|profiles.json|All files|*.*",
+            FileName = "profiles.json",
+            CheckFileExists = false,
+        };
+
+        // Set initial directory from current path
+        var currentDir = Path.GetDirectoryName(_store.FilePath);
+        if (!string.IsNullOrEmpty(currentDir) && Directory.Exists(currentDir))
+            dlg.InitialDirectory = currentDir;
+
+        if (dlg.ShowDialog() != true)
+            return;
+
+        var selectedPath = dlg.FileName;
+
+        // Ensure the filename is profiles.json
+        if (!Path.GetFileName(selectedPath).Equals("profiles.json", StringComparison.OrdinalIgnoreCase))
+            selectedPath = Path.Combine(Path.GetDirectoryName(selectedPath) ?? selectedPath, "profiles.json");
+
+        try
+        {
+            _appSettings.SetProfilesPath(selectedPath);
+            _store.ChangePath(selectedPath);
+            ProfilesPathDisplay = _store.FilePath;
+
+            SyncEnabled = _store.Data.Settings.SyncMinMax != 0;
+            ShowGuiOnStartup = _store.Data.Settings.ShowGuiOnStartup != 0;
+
+            ReloadProfiles();
+            _syncManager.ScheduleRebuild();
+            StatusText = $"保存先を変更しました: {selectedPath}";
+            _log.Information("Profiles path changed to {Path}", selectedPath);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "BrowseProfilesPath failed");
+            StatusText = $"保存先の変更に失敗: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ResetProfilesPath()
+    {
+        try
+        {
+            _appSettings.SetProfilesPath("");
+            var defaultPath = _appSettings.EffectiveProfilesPath;
+            _store.ChangePath(defaultPath);
+            ProfilesPathDisplay = _store.FilePath;
+
+            SyncEnabled = _store.Data.Settings.SyncMinMax != 0;
+            ShowGuiOnStartup = _store.Data.Settings.ShowGuiOnStartup != 0;
+
+            ReloadProfiles();
+            _syncManager.ScheduleRebuild();
+            StatusText = $"保存先を既定に戻しました: {defaultPath}";
+            _log.Information("Profiles path reset to default: {Path}", defaultPath);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "ResetProfilesPath failed");
+            StatusText = $"既定へのリセットに失敗: {ex.Message}";
+        }
     }
 }

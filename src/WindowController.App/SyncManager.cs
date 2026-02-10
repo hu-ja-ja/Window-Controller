@@ -24,6 +24,16 @@ public class SyncManager : IDisposable
     private long _lastRebuildTick;
     private bool _disposed;
 
+    // Debounce rebuild: avoid multiple rapid rebuilds
+    private CancellationTokenSource? _rebuildCts;
+    private readonly object _rebuildLock = new();
+
+    // WinEvent throttle: skip duplicate events within a short window
+    private nint _lastEventHwnd;
+    private uint _lastEventType;
+    private long _lastEventTick;
+    private const long EventThrottleMs = 30;
+
     public SyncManager(ProfileStore store, WindowEnumerator enumerator,
         WinEventHookManager hookManager, ILogger log)
     {
@@ -34,9 +44,12 @@ public class SyncManager : IDisposable
         _hookManager.EventReceived += OnWinEvent;
     }
 
+    /// <summary>
+    /// Rebuild sync groups using lightweight enumeration (no WMI/UIA).
+    /// </summary>
     public void RebuildGroups()
     {
-        var candidates = GetCandidates();
+        var candidates = GetCandidatesLightweight();
         var newGroups = new Dictionary<string, HashSet<nint>>();
 
         foreach (var profile in _store.Data.Profiles)
@@ -58,12 +71,40 @@ public class SyncManager : IDisposable
         _lastRebuildTick = Environment.TickCount64;
     }
 
-    public void UpdateHooksIfNeeded()
+    /// <summary>
+    /// Schedule a debounced async rebuild (won't block caller).
+    /// </summary>
+    public void ScheduleRebuild(int delayMs = 100)
+    {
+        lock (_rebuildLock)
+        {
+            _rebuildCts?.Cancel();
+            _rebuildCts = new CancellationTokenSource();
+            var token = _rebuildCts.Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(delayMs, token);
+                    if (!token.IsCancellationRequested)
+                        RebuildGroups();
+                }
+                catch (OperationCanceledException) { /* debounced away */ }
+                catch (Exception ex)
+                {
+                    _log.Warning(ex, "ScheduleRebuild failed");
+                }
+            }, token);
+        }
+    }
+
+    public void UpdateHooksIfNeeded(bool skipRebuild = false)
     {
         if (_store.Data.Settings.SyncMinMax != 0 && HasAnySyncProfile())
         {
             _hookManager.Install();
-            RebuildGroups();
+            if (!skipRebuild)
+                ScheduleRebuild();
         }
         else
         {
@@ -82,6 +123,15 @@ public class SyncManager : IDisposable
         {
             if (_isPropagating) return;
             if (_store.Data.Settings.SyncMinMax == 0) return;
+
+            // Throttle duplicate events for the same hwnd within a short window
+            var now = Environment.TickCount64;
+            if (hwnd == _lastEventHwnd && eventType == _lastEventType
+                && now - _lastEventTick < EventThrottleMs)
+                return;
+            _lastEventHwnd = hwnd;
+            _lastEventType = eventType;
+            _lastEventTick = now;
 
             if (eventType == NativeMethods.EVENT_SYSTEM_FOREGROUND)
             {
@@ -233,13 +283,16 @@ public class SyncManager : IDisposable
 
     private void TryRebuild()
     {
-        if (Environment.TickCount64 - _lastRebuildTick > 1200)
-            RebuildGroups();
+        if (Environment.TickCount64 - _lastRebuildTick > 2000)
+            ScheduleRebuild(50);
     }
 
-    private List<WindowCandidate> GetCandidates()
+    /// <summary>
+    /// Lightweight candidate list: no WMI, no UIA — just hwnd/exe/class/title/path.
+    /// </summary>
+    private List<WindowCandidate> GetCandidatesLightweight()
     {
-        var wins = _enumerator.EnumerateWindows();
+        var wins = _enumerator.EnumerateWindows(lightweight: true);
         return wins.Select(w => new WindowCandidate
         {
             Hwnd = w.Hwnd,
@@ -247,8 +300,8 @@ public class SyncManager : IDisposable
             Class = w.Class,
             Title = w.Title,
             Path = w.Path,
-            Url = w.Url,
-            CommandLine = w.CommandLine
+            Url = "",
+            CommandLine = ""
         }).ToList();
     }
 

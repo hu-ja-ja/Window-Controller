@@ -18,15 +18,31 @@ public class ProfileStore
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    private readonly string _filePath;
+    private string _filePath;
     private readonly ILogger _log;
 
     public ProfilesRoot Data { get; private set; } = new();
+
+    /// <summary>
+    /// Current profiles.json path.
+    /// </summary>
+    public string FilePath => _filePath;
 
     public ProfileStore(string filePath, ILogger logger)
     {
         _filePath = filePath;
         _log = logger;
+    }
+
+    /// <summary>
+    /// Change the profiles.json path and reload data from the new location.
+    /// If the new file does not exist, creates a default one there.
+    /// </summary>
+    public void ChangePath(string newPath)
+    {
+        _filePath = newPath;
+        Load();
+        _log.Information("ProfileStore path changed to {Path}", newPath);
     }
 
     public void Load()

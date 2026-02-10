@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Management;
 using System.Text;
@@ -32,6 +33,10 @@ public class WindowEnumerator
     private readonly ILogger _log;
     private readonly Func<nint, string, string>? _urlGetter;
 
+    // WMI command-line cache: PID → (commandLine, tickWhenCached)
+    private readonly ConcurrentDictionary<uint, (string CmdLine, long Tick)> _cmdLineCache = new();
+    private const long CmdLineCacheTtlMs = 60_000; // 1 minute
+
     public WindowEnumerator(ILogger logger, Func<nint, string, string>? urlGetter = null)
     {
         _log = logger;
@@ -40,8 +45,10 @@ public class WindowEnumerator
 
     /// <summary>
     /// Enumerate all visible top-level windows.
+    /// <param name="lightweight">If true, skip expensive WMI command-line and UIA URL retrieval.
+    /// Use for sync matching where only exe/class/title/path are needed.</param>
     /// </summary>
-    public List<WindowInfo> EnumerateWindows()
+    public List<WindowInfo> EnumerateWindows(bool lightweight = false)
     {
         var results = new List<WindowInfo>();
         var hwnds = new List<nint>();
@@ -75,15 +82,23 @@ public class WindowEnumerator
                 var exe = GetProcessName(pid);
                 var cls = GetClassName(hwnd);
                 var path = GetProcessPath(pid);
-                var cmdLine = GetCommandLine(pid);
+
+                var cmdLine = "";
+                if (!lightweight)
+                {
+                    cmdLine = GetCommandLineCached(pid);
+                }
 
                 var url = "";
-                try
+                if (!lightweight)
                 {
-                    if (_urlGetter != null)
-                        url = _urlGetter(hwnd, exe);
+                    try
+                    {
+                        if (_urlGetter != null)
+                            url = _urlGetter(hwnd, exe);
+                    }
+                    catch { /* best effort */ }
                 }
-                catch { /* best effort */ }
 
                 var browserProfile = "";
                 var exeLower = exe.ToLowerInvariant();
@@ -220,5 +235,40 @@ public class WindowEnumerator
         }
         catch { /* WMI may fail for protected processes */ }
         return "";
+    }
+
+    /// <summary>
+    /// Get command line with caching to avoid repeated expensive WMI calls.
+    /// </summary>
+    public string GetCommandLineCached(uint pid)
+    {
+        var now = Environment.TickCount64;
+
+        if (_cmdLineCache.TryGetValue(pid, out var cached) && now - cached.Tick < CmdLineCacheTtlMs)
+            return cached.CmdLine;
+
+        // Only query WMI for browser processes to avoid unnecessary overhead
+        var exeName = GetProcessName(pid).ToLowerInvariant();
+        if (!BrowserIdentifier.IsBrowser(exeName))
+        {
+            _cmdLineCache[pid] = ("", now);
+            return "";
+        }
+
+        var cmdLine = GetCommandLine(pid);
+        _cmdLineCache[pid] = (cmdLine, now);
+
+        // Prune stale entries periodically
+        if (_cmdLineCache.Count > 200)
+        {
+            var staleKeys = _cmdLineCache
+                .Where(kv => now - kv.Value.Tick > CmdLineCacheTtlMs * 2)
+                .Select(kv => kv.Key)
+                .ToList();
+            foreach (var key in staleKeys)
+                _cmdLineCache.TryRemove(key, out _);
+        }
+
+        return cmdLine;
     }
 }
