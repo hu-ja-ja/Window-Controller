@@ -1,89 +1,86 @@
-# Window-Controller (.NET / WPF版)
+# Window-Controller
 
-AHK版と同等のUX/機能を C#/.NET 8 + WPF で再実装したWindows常駐ユーティリティです。
+ウィンドウの配置を保存・復元できる Windows 常駐ユーティリティです。
+マルチモニター環境やブラウザの複数ウィンドウ運用を効率化します。
 
-## 前提
+## ダウンロード・インストール
 
-- **Windows** (Windows 10/11)
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 以上
+1. [Releases](https://github.com/hu-ja-ja/Window-Controller/releases) から最新の `WindowController-vX.X.X-win-x64.zip` をダウンロード
+2. 任意のフォルダに展開
+3. `WindowController.exe` を実行
 
-## ビルド・実行
+> .NET ランタイムは同梱済み（自己完結型）のため、別途インストール不要です。
+> 二重起動は自動でブロックされます。
 
-```bash
-cd src
-dotnet build
-dotnet run --project WindowController.App
-```
+## 動作環境
 
-Release ビルド:
-
-```bash
-cd src
-dotnet build --configuration Release
-dotnet run --project WindowController.App --configuration Release
-```
+- Windows 10 / 11 (x64)
 
 ## 機能
 
-AHK版と同等の操作導線を提供します。
+### プロファイル保存
 
-### 1) プロファイル保存
+GUI で起動中のウィンドウを一覧表示し、チェックしたウィンドウの配置を「プロファイル」として保存します。
 
-- GUI上段で起動中ウィンドウを一覧表示
-- チェックしたウィンドウのスナップショットを保存
-  - exe / class / title / path
-  - rect（座標とサイズ）
-  - minMax（-1=最小化 / 0=通常 / 1=最大化）
-  - snap（左右/上下/四分割の自動判定）+ monitor情報
-  - ブラウザURL（UI Automationで非侵襲的に取得）
+- 各ウィンドウの位置・サイズ・状態（最小化/最大化/通常）を記録
+- スナップ位置（左半分、右半分など）を自動検出 → モニタ構成が変わっても再計算
+- ブラウザの URL を UI Automation で取得（クリップボードやフォーカスに一切触れません）
 
-### 2) プロファイル適用（配置のみ）
+### プロファイル適用（配置のみ）
 
-- マッチングで対象ウィンドウを解決し、rect/minmax/snapで復元
-- snap情報がある場合は現在のモニタのワークエリアから再計算
+保存済みプロファイルを選んで「適用」すると、対応ウィンドウを検索して配置を復元します。
 
-### 3) 一括起動＋配置
+### 一括起動 ＋ 配置
 
-- 見つからないウィンドウは `path` や URL から起動を試み、配置
-- 起動後リトライ（最大12秒）でウィンドウ出現を待機
+見つからないウィンドウはアプリを起動した上で配置します（最大 12 秒待機）。
 
-### 4) 最小化/最大化（＋前面順）の常時連動
+### 最小化 / 最大化の連動
 
-- 全体スイッチ + プロファイル単位のON/OFF
-- WinEventHookで最小化/復元/最大化/前面イベントを監視
-- 同一プロファイルグループ内で状態を伝播
-- 曖昧なマッチは同期対象から除外（誤爆防止）
+プロファイル内のウィンドウを「グループ」として扱い、1 つを最小化・復元すると他も追従させます。
 
-## 操作導線
+- 全体 ON/OFF ＋ プロファイル個別 ON/OFF
+- 曖昧なマッチは連動対象から自動除外（誤爆防止）
 
-### トレイメニュー
+## 使い方
 
-起動後、タスクトレイに常駐します。
+### タスクトレイ
 
-- **GUIを開く**: 設定画面を表示
-- **プロファイルを適用(配置のみ)**: GUI表示
-- **終了**: アプリ終了
+起動するとタスクトレイに常駐します。
+
+| メニュー | 動作 |
+|---|---|
+| **GUI を開く** | 設定画面を表示 |
+| **プロファイルを適用 (配置のみ)** | GUI を表示 |
+| **終了** | アプリを終了 |
 
 ### ホットキー
 
-- **Ctrl + Alt + W**: GUIを開く
+| キー | 動作 |
+|---|---|
+| **Ctrl + Alt + W** | GUI を開く |
 
-### GUI構成
+### GUI
 
-- 上段: 起動中ウィンドウ一覧（チェックボックス付き）
-- プロファイル名入力 + 「チェックを保存」ボタン
-- 下段: 保存済みプロファイル一覧（チェック=連動ON/OFF）
-- ボタン: 適用（配置のみ） / 一括起動＋配置 / 削除
-- チェック: 連動機能を有効にする（全体） / 起動時にGUIを表示する
+| 領域 | 説明 |
+|---|---|
+| 上段 | 起動中ウィンドウ一覧（チェックして保存対象を選択） |
+| 中段 | プロファイル名入力 → 「チェックを保存」 |
+| 下段 | 保存済みプロファイル一覧（チェック＝連動 ON/OFF） |
+| ボタン | 適用（配置のみ）/ 一括起動＋配置 / 削除 |
+| 設定 | 連動機能全体 ON/OFF、起動時 GUI 表示、profiles.json 保存先変更 |
 
-## 設定ファイル
+## データの保存場所
 
-`config/profiles.json` にAHK版と互換の形式で保存されます。
+| ファイル | パス |
+|---|---|
+| 設定 | `%LOCALAPPDATA%\WindowController\appsettings.json` |
+| プロファイル | `%LOCALAPPDATA%\WindowController\profiles.json` （GUI で変更可能） |
+| ログ | `%LOCALAPPDATA%\WindowController\window-controller.log` |
 
-- アプリ実行ディレクトリの `config/` に自動生成
-- JSON破損時はバックアップ退避して初期化
+> `profiles.json` の保存先は GUI 下部の「変更…」ボタンで任意のフォルダに変更できます。
+> 「既定に戻す」で上記デフォルトに戻ります。
 
-### JSON スキーマ
+### profiles.json スキーマ
 
 ```json
 {
@@ -94,22 +91,22 @@ AHK版と同等の操作導線を提供します。
   },
   "profiles": [
     {
-      "name": "プロファイル名",
+      "name": "作業用レイアウト",
       "syncMinMax": 0,
       "createdAt": "2026-01-01T20:20:20",
       "updatedAt": "2026-01-01T20:20:20",
       "windows": [
         {
           "match": {
-            "exe": "app.exe",
-            "class": "ClassName",
+            "exe": "Code - Insiders.exe",
+            "class": "Chrome_WidgetWin_1",
             "title": "Window Title",
             "url": "",
             "urlKey": "",
             "browser": null
           },
-          "path": "C:\\path\\to\\app.exe",
-          "rect": { "x": 0, "y": 0, "w": 1000, "h": 700 },
+          "path": "C:\\Users\\you\\AppData\\Local\\Programs\\...\\Code - Insiders.exe",
+          "rect": { "x": 0, "y": 0, "w": 960, "h": 1040 },
           "minMax": 0,
           "snap": { "type": "left" },
           "monitor": { "index": 1, "name": "\\\\.\\DISPLAY1" }
@@ -120,44 +117,54 @@ AHK版と同等の操作導線を提供します。
 }
 ```
 
-## ログ
+## ブラウザ URL 取得
 
-- `config/window-controller.log` : 動作ログ（Serilog）
+| ブラウザ | 方式 | 備考 |
+|---|---|---|
+| Chrome / Edge / Brave / Vivaldi | UI Automation (ValuePattern) | 非侵襲 |
+| Firefox / Floorp | UI Automation | 取得不可時は空（誤マッチ防止） |
 
-## ブラウザURL取得
+## ビルド（開発者向け）
 
-- **Chromium系** (Chrome/Edge/Brave/Vivaldi): UI AutomationのValuePatternで非侵襲的に取得
-- **Firefox/Floorp**: UI Automationで取得を試みる（クリップボード不使用）
-  - 取得できない場合は空のまま（誤マッチ防止のためURLなしとして扱う）
+```bash
+# ビルド
+cd src
+dotnet build
 
-## マッチング仕様
+# 実行
+dotnet run --project WindowController.App
 
-- 必須条件: exe + class（classはワイルドカード対応）
-- スコアリング:
-  - process path一致: +60
-  - browser profile一致: +50～70
-  - urlKey完全一致: +60
-  - host一致: +20
-  - title完全/部分一致: +10～30
-- 同期時は曖昧一致（スコア差≤10 かつ スコア<50）を除外
-
-## プロジェクト構成
-
-```text
-src/
-  WindowController.sln
-  WindowController.Core/       # モデル、URL正規化、マッチングロジック
-  WindowController.Win32/       # P/Invoke、ウィンドウ列挙/配置、モニタ、WinEventHook
-  WindowController.Browser/     # FlaUI.UIA3によるURL取得
-  WindowController.App/         # WPF アプリ（トレイ、GUI、ViewModel）
+# 公開用ビルド（単一ファイル・自己完結型）
+dotnet publish WindowController.App -c Release
+# 出力先: src/WindowController.App/bin/Release/net8.0-windows/win-x64/publish/
 ```
 
-## 技術スタック
+### 必要環境
 
-- .NET 8, WPF
-- CommunityToolkit.Mvvm (MVVM)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 以上
+- Windows 10 / 11
+
+### プロジェクト構成
+
+```
+src/
+  WindowController.sln
+  WindowController.Core/       モデル、URL正規化、マッチングロジック
+  WindowController.Win32/      P/Invoke、ウィンドウ列挙/配置、WinEventHook
+  WindowController.Browser/    FlaUI.UIA3 による URL 取得
+  WindowController.App/        WPF アプリ（トレイ、GUI、ViewModel）
+```
+
+### 技術スタック
+
+- .NET 8 / WPF
+- CommunityToolkit.Mvvm
 - FlaUI.UIA3 (UI Automation)
 - Serilog (Logging)
 - Hardcodet.NotifyIcon.Wpf (System Tray)
-- System.Text.Json (JSON)
-- System.Management (WMI CommandLine取得)
+- System.Text.Json
+- System.Management (WMI)
+
+## ライセンス
+
+[LICENSE](../LICENSE) を参照してください。

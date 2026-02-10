@@ -1,5 +1,6 @@
 ﻿using System.Drawing;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Interop;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -13,6 +14,7 @@ namespace WindowController.App;
 
 public partial class App : Application
 {
+    private static Mutex? _singleInstanceMutex;
     private TaskbarIcon? _trayIcon;
     private MainWindow? _mainWindow;
     private MainViewModel? _viewModel;
@@ -24,17 +26,28 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // --- Single-instance guard ---
+        _singleInstanceMutex = new Mutex(true, "Global\\WindowController_SingleInstance", out var createdNew);
+        if (!createdNew)
+        {
+            MessageBox.Show("Window-Controller は既に起動しています。", "Window-Controller",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
+
         try
         {
-            // Determine config directory (next to exe, or fallback)
-            var baseDir = AppContext.BaseDirectory;
-            var configDir = Path.Combine(baseDir, "config");
-            if (!Directory.Exists(configDir))
-                Directory.CreateDirectory(configDir);
+            // --- Data directory: %LOCALAPPDATA%\WindowController ---
+            var dataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "WindowController");
+            if (!Directory.Exists(dataDir))
+                Directory.CreateDirectory(dataDir);
 
-            var logPath = Path.Combine(configDir, "window-controller.log");
-            var defaultProfilesPath = Path.Combine(configDir, "profiles.json");
-            var appSettingsPath = Path.Combine(configDir, "appsettings.json");
+            var logPath = Path.Combine(dataDir, "window-controller.log");
+            var defaultProfilesPath = Path.Combine(dataDir, "profiles.json");
+            var appSettingsPath = Path.Combine(dataDir, "appsettings.json");
 
             // Setup Serilog
             Log.Logger = new LoggerConfiguration()
@@ -151,6 +164,8 @@ public partial class App : Application
         _syncManager?.Dispose();
         _trayIcon?.Dispose();
         Log.CloseAndFlush();
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
 }

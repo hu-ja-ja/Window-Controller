@@ -4,6 +4,9 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <Authors>hu-ja-ja</Authors>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
