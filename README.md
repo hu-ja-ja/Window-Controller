@@ -1,111 +1,115 @@
 # Window-Controller
 
-AutoHotkey v2 で動く「ウィンドウ配置プロファイル」ツールです。
-起動中のウィンドウをチェックして **配置（位置・サイズ・最小化/最大化状態）** を保存し、ワンクリックで再適用できます。
+ウィンドウの配置を保存・復元できる Windows 常駐ユーティリティです。
+マルチモニター環境やブラウザの複数ウィンドウ運用を効率化します。
 
-加えて、プロファイル単位で **最小化/最大化（＋前面順）を常時連動** させることもできます（任意）。
+## ダウンロード・インストール
+
+1. [Releases](https://github.com/hu-ja-ja/Window-Controller/releases) から最新の `WindowController-vX.X.X-win-x64.zip` をダウンロード
+2. 任意のフォルダに展開
+3. `WindowController.exe` を実行
+
+> .NET ランタイムは同梱済み（自己完結型）のため、別途インストール不要です。
+> 二重起動は自動でブロックされます。
 
 ## 動作環境
 
-- Windows
-- [AutoHotkey v2](https://www.autohotkey.com/)（`#Requires AutoHotkey v2.0`）
-
-## 使い方（クイックスタート）
-
-1. AutoHotkey v2 をインストール
-2. `main.ahk` を実行
-3. GUI を開く
-   - トレイ: **GUIを開く**
-   - ホットキー: `Ctrl + Alt + W`
-4. 上段「起動中ウィンドウ」一覧で、保存したいウィンドウにチェック
-5. 右側の「プロファイル名」を入力して **チェックを保存**
-6. 下段「保存済みプロファイル」から選んで **適用（配置のみ）**
-
-### 一括起動＋配置
-
-下段の **一括起動＋配置** は、プロファイルに含まれるウィンドウが見つからない場合に、保存時の情報（実行ファイル/パス、URL など）を元に起動を試みた上で配置します。
+- Windows 10 / 11 (x64)
 
 ## 機能
 
-### 1) プロファイル保存
+### プロファイル保存
 
-GUI 上段でチェックしたウィンドウのスナップショットを保存します。
+GUI で起動中のウィンドウを一覧表示し、チェックしたウィンドウの配置を「プロファイル」として保存します。
 
-保存される主な情報:
-- 対象の識別情報（`exe` / `class` / `title` / （ブラウザなら URL など））
-- 実行ファイルパス（取得できた場合）
-- ウィンドウ矩形（x/y/w/h）
-- 最小化/最大化状態（`minMax`: `-1/0/1`）
-- スナップ配置（左右/上下/四分割）判定できた場合は `snap` とモニタ情報
+- 各ウィンドウの位置・サイズ・状態（最小化/最大化/通常）を記録
+- スナップ位置（左半分、右半分など）を自動検出 → モニタ構成が変わっても再計算
+- ブラウザの URL を UI Automation で取得（クリップボードやフォーカスに一切触れません）
 
-### 2) プロファイル適用（配置のみ）
+### プロファイル適用（配置のみ）
 
-保存した矩形・状態へ復元します。
-- `minMax = -1`: 最小化
-- `minMax = 0`: 通常
-- `minMax = 1`: 最大化
+保存済みプロファイルを選んで「適用」すると、対応ウィンドウを検索して配置を復元します。
 
-スナップ情報（`snap`）がある場合は、保存したモニタの **ワークエリア** から再計算して配置します。
+### 一括起動 ＋ 配置
 
-### 3) 最小化/最大化（＋前面順）の常時連動（任意）
+見つからないウィンドウはアプリを起動した上で配置します（最大 12 秒待機）。
 
-- 全体スイッチ: GUI の **連動機能を有効にする（全体）**
-- プロファイル単位: 下段リストの **チェック**
+### 最小化 / 最大化の連動
 
-有効時、同じプロファイルに属するウィンドウの
-- 最小化 / 復元 / 最大化
-- 前面に来たときの Z オーダー（フォーカスは奪わないように調整）
+プロファイル内のウィンドウを「グループ」として扱い、1 つを最小化・復元すると他も追従させます。
 
-を同一グループ内へ伝播します。
+- 全体 ON/OFF ＋ プロファイル個別 ON/OFF
+- 曖昧なマッチは連動対象から自動除外（誤爆防止）
 
-## 設定ファイル
+## 使い方
 
-設定は `config/profiles.json` に保存されます。
+### タスクトレイ
 
-- アプリ初回起動時に `config/` が無い場合は自動生成します
-- JSON が壊れている場合は、バックアップへ退避して初期化します（`.broken.YYYYMMDD_HHMMSS`）
+起動するとタスクトレイに常駐します。
 
-### settings
+| メニュー | 動作 |
+|---|---|
+| **GUI を開く** | 設定画面を表示 |
+| **プロファイルを適用 (配置のみ)** | GUI を表示 |
+| **終了** | アプリを終了 |
 
-- `settings.syncMinMax`（0/1）: 連動機能（全体）の ON/OFF
-- `settings.showGuiOnStartup`（0/1）: 起動時に GUI を開くか（OFF ならトレイ常駐）
+### ホットキー
 
-### profiles（例）
+| キー | 動作 |
+|---|---|
+| **Ctrl + Alt + W** | GUI を開く |
 
-`config/profiles.json` は概ね次の形です（例は概略です）。
+### GUI
+
+| 領域 | 説明 |
+|---|---|
+| 上段 | 起動中ウィンドウ一覧（チェックして保存対象を選択） |
+| 中段 | プロファイル名入力 → 「チェックを保存」 |
+| 下段 | 保存済みプロファイル一覧（チェック＝連動 ON/OFF） |
+| ボタン | 適用（配置のみ）/ 一括起動＋配置 / 削除 |
+| 設定 | 連動機能全体 ON/OFF、起動時 GUI 表示、profiles.json 保存先変更 |
+
+## データの保存場所
+
+| ファイル | パス |
+|---|---|
+| 設定 | `%LOCALAPPDATA%\WindowController\appsettings.json` |
+| プロファイル | `%LOCALAPPDATA%\WindowController\profiles.json` （GUI で変更可能） |
+| ログ | `%LOCALAPPDATA%\WindowController\window-controller.log` |
+
+> `profiles.json` の保存先は GUI 下部の「変更…」ボタンで任意のフォルダに変更できます。
+> 「既定に戻す」で上記デフォルトに戻ります。
+
+### profiles.json スキーマ
 
 ```json
 {
   "version": 1,
   "settings": {
-    "syncMinMax": 1,
-    "showGuiOnStartup": 0
+    "syncMinMax": 0,
+    "showGuiOnStartup": 1
   },
   "profiles": [
     {
-      "name": "左画面",
-      "syncMinMax": 1,
+      "name": "作業用レイアウト",
+      "syncMinMax": 0,
       "createdAt": "2026-01-01T20:20:20",
       "updatedAt": "2026-01-01T20:20:20",
       "windows": [
         {
           "match": {
-            "exe": "Discord.exe",
+            "exe": "Code - Insiders.exe",
             "class": "Chrome_WidgetWin_1",
-            "title": "#chat | ...",
+            "title": "Window Title",
             "url": "",
             "urlKey": "",
-            "browser": {
-              "kind": "chromium",
-              "userDataDir": "C:\\...",
-              "profileDirectory": "Default"
-            }
+            "browser": null
           },
-          "path": "C:\\Users\\...\\Discord.exe",
-          "rect": { "x": 0, "y": 0, "w": 1000, "h": 700 },
+          "path": "C:\\Users\\you\\AppData\\Local\\Programs\\...\\Code - Insiders.exe",
+          "rect": { "x": 0, "y": 0, "w": 960, "h": 1040 },
           "minMax": 0,
           "snap": { "type": "left" },
-          "monitor": { "index": 1, "name": "..." }
+          "monitor": { "index": 1, "name": "\\\\.\\DISPLAY1" }
         }
       ]
     }
@@ -113,35 +117,54 @@ GUI 上段でチェックしたウィンドウのスナップショットを保�
 }
 ```
 
-## トレイメニュー
+## ブラウザ URL 取得
 
-`main.ahk` 実行後、タスクトレイに常駐します。
+| ブラウザ | 方式 | 備考 |
+|---|---|---|
+| Chrome / Edge / Brave / Vivaldi | UI Automation (ValuePattern) | 非侵襲 |
+| Firefox / Floorp | UI Automation | 取得不可時は空（誤マッチ防止） |
 
-- **GUIを開く**: 設定画面を表示
-- **プロファイルを適用(配置のみ)**: GUI を開き、適用操作に入りやすい状態にします
-- **終了**: 終了
+## ビルド（開発者向け）
 
-## ログ / エラー
+```bash
+# ビルド
+cd src
+dotnet build
 
-`config/` に出力されます。
+# 実行
+dotnet run --project WindowController.App
 
-- `config/window-controller.log` : 動作ログ（連動の伝播など）
-- `config/__last_error.txt` : 未処理例外（保険のエラーログ）
-- `config/__exit_log.txt` : 終了ログ
+# 公開用ビルド（単一ファイル・自己完結型）
+dotnet publish WindowController.App -c Release
+# 出力先: src/WindowController.App/bin/Release/net8.0-windows/win-x64/publish/
+```
 
-## 既知の注意点
+### 必要環境
 
-- 管理者権限で動くアプリや保護されたウィンドウは、通常権限のスクリプトから操作できない場合があります。
-  - その場合はスクリプトを管理者として実行する必要があるかもしれません。
-- Firefox 系（`firefox.exe` / `floorp.exe`）の URL 取得は、保存時のみクリップボード経由のベストエフォートです（フォーカス移動が発生します）。
-  - Chromium 系（Chrome/Edge/Brave/Vivaldi）は、可能な範囲で非侵襲的に取得します。
-- ウィンドウの再生成（HWND 変化）が頻繁に起きるアプリでは、連動対象の解決が遅れることがあります。
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 以上
+- Windows 10 / 11
 
-## 開発メモ（構成）
+### プロジェクト構成
 
-- `main.ahk`: エントリポイント（トレイ/ホットキー/OnExit/OnError）
-- `gui.ahk`: GUI（ウィンドウ一覧・プロファイル操作）
-- `window_control.ahk`: 本体ロジック（保存/適用/WinEventフックによる連動）
-- `json.ahk`: JSON Parse/Stringify（最小実装）
+```
+src/
+  WindowController.sln
+  WindowController.Core/       モデル、URL正規化、マッチングロジック
+  WindowController.Win32/      P/Invoke、ウィンドウ列挙/配置、WinEventHook
+  WindowController.Browser/    FlaUI.UIA3 による URL 取得
+  WindowController.App/        WPF アプリ（トレイ、GUI、ViewModel）
+```
 
----
+### 技術スタック
+
+- .NET 8 / WPF
+- CommunityToolkit.Mvvm
+- FlaUI.UIA3 (UI Automation)
+- Serilog (Logging)
+- Hardcodet.NotifyIcon.Wpf (System Tray)
+- System.Text.Json
+- System.Management (WMI)
+
+## ライセンス
+
+[LICENSE](../LICENSE) を参照してください。
