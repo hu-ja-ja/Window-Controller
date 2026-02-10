@@ -1,0 +1,224 @@
+using System.Diagnostics;
+using System.Management;
+using System.Text;
+using Serilog;
+using WindowController.Core;
+using WindowController.Core.Models;
+
+namespace WindowController.Win32;
+
+/// <summary>
+/// Information about a running top-level window.
+/// </summary>
+public class WindowInfo
+{
+    public nint Hwnd { get; init; }
+    public string Title { get; init; } = "";
+    public string Exe { get; init; } = "";
+    public string Class { get; init; } = "";
+    public string Path { get; init; } = "";
+    public string Url { get; init; } = "";
+    public string BrowserProfile { get; init; } = "";
+    public string CommandLine { get; init; } = "";
+    public int MinMax { get; init; }
+    public Core.Models.Rect Rect { get; init; } = new();
+}
+
+/// <summary>
+/// Enumerate and manipulate windows using Win32 APIs.
+/// </summary>
+public class WindowEnumerator
+{
+    private readonly ILogger _log;
+    private readonly Func<nint, string, string>? _urlGetter;
+
+    public WindowEnumerator(ILogger logger, Func<nint, string, string>? urlGetter = null)
+    {
+        _log = logger;
+        _urlGetter = urlGetter;
+    }
+
+    /// <summary>
+    /// Enumerate all visible top-level windows.
+    /// </summary>
+    public List<WindowInfo> EnumerateWindows()
+    {
+        var results = new List<WindowInfo>();
+        var hwnds = new List<nint>();
+
+        NativeMethods.EnumWindows((hwnd, _) =>
+        {
+            hwnds.Add(hwnd);
+            return true;
+        }, 0);
+
+        foreach (var hwnd in hwnds)
+        {
+            try
+            {
+                if (!NativeMethods.IsWindowVisible(hwnd))
+                    continue;
+
+                var title = GetWindowTitle(hwnd);
+                if (string.IsNullOrEmpty(title))
+                    continue;
+
+                var style = (uint)NativeMethods.GetWindowLongW(hwnd, NativeMethods.GWL_STYLE);
+                var exStyle = (uint)NativeMethods.GetWindowLongW(hwnd, NativeMethods.GWL_EXSTYLE);
+
+                if ((style & NativeMethods.WS_VISIBLE) == 0)
+                    continue;
+                if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0)
+                    continue;
+
+                NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
+                var exe = GetProcessName(pid);
+                var cls = GetClassName(hwnd);
+                var path = GetProcessPath(pid);
+                var cmdLine = GetCommandLine(pid);
+
+                var url = "";
+                try
+                {
+                    if (_urlGetter != null)
+                        url = _urlGetter(hwnd, exe);
+                }
+                catch { /* best effort */ }
+
+                var browserProfile = "";
+                var exeLower = exe.ToLowerInvariant();
+                if (BrowserIdentifier.IsBrowser(exeLower))
+                {
+                    var ident = BrowserIdentifier.ExtractIdentity(exeLower, cmdLine);
+                    if (ident != null)
+                    {
+                        browserProfile = ident.ProfileDirectory
+                            ?? ident.ProfileName
+                            ?? ident.ProfileDir
+                            ?? "";
+                    }
+                }
+
+                var minMax = GetMinMax(hwnd);
+                var rect = GetWindowRect(hwnd);
+
+                results.Add(new WindowInfo
+                {
+                    Hwnd = hwnd,
+                    Title = title,
+                    Exe = exe,
+                    Class = cls,
+                    Path = path,
+                    Url = url,
+                    BrowserProfile = browserProfile,
+                    CommandLine = cmdLine,
+                    MinMax = minMax,
+                    Rect = rect
+                });
+            }
+            catch (Exception ex)
+            {
+                _log.Warning(ex, "EnumerateWindows item failed for hwnd {Hwnd}", hwnd);
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Get the min/max state: -1=minimized, 0=normal, 1=maximized.
+    /// </summary>
+    public static int GetMinMax(nint hwnd)
+    {
+        if (NativeMethods.IsIconic(hwnd)) return -1;
+        if (NativeMethods.IsZoomed(hwnd)) return 1;
+        return 0;
+    }
+
+    public static string GetWindowTitle(nint hwnd)
+    {
+        var len = NativeMethods.GetWindowTextLengthW(hwnd);
+
+        if (len > 0)
+        {
+            var sb = new StringBuilder(len + 1);
+            var copied = NativeMethods.GetWindowTextW(hwnd, sb, sb.Capacity);
+            if (copied <= 0) return "";
+            return sb.ToString(0, copied);
+        }
+
+        // Some windows return 0 length from GetWindowTextLengthW but still have text.
+        // Best-effort fallback with a reasonable cap.
+        {
+            const int fallbackCap = 2048;
+            var sb = new StringBuilder(fallbackCap);
+            var copied = NativeMethods.GetWindowTextW(hwnd, sb, sb.Capacity);
+            if (copied <= 0) return "";
+            return sb.ToString(0, copied);
+        }
+    }
+
+    public static string GetClassName(nint hwnd)
+    {
+        var sb = new StringBuilder(256);
+        var len = NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+        return len > 0 ? sb.ToString(0, len) : "";
+    }
+
+    public static Core.Models.Rect GetWindowRect(nint hwnd)
+    {
+        NativeMethods.GetWindowRect(hwnd, out var r);
+        return new Core.Models.Rect
+        {
+            X = r.Left,
+            Y = r.Top,
+            W = r.Right - r.Left,
+            H = r.Bottom - r.Top
+        };
+    }
+
+    public static string GetProcessName(uint pid)
+    {
+        try
+        {
+            using var proc = Process.GetProcessById((int)pid);
+            return proc.ProcessName + ".exe";
+        }
+        catch { return ""; }
+    }
+
+    public static string GetProcessPath(uint pid)
+    {
+        var hProc = NativeMethods.OpenProcess(NativeMethods.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (hProc == 0) return "";
+        try
+        {
+            var buf = new char[1024];
+            uint size = (uint)buf.Length;
+            if (NativeMethods.QueryFullProcessImageNameW(hProc, 0, buf, ref size))
+                return new string(buf, 0, (int)size);
+            return "";
+        }
+        finally
+        {
+            NativeMethods.CloseHandle(hProc);
+        }
+    }
+
+    public static string GetCommandLine(uint pid)
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                $"Select CommandLine from Win32_Process where ProcessId={pid}");
+            foreach (var obj in searcher.Get())
+            {
+                var cl = obj["CommandLine"]?.ToString();
+                if (!string.IsNullOrEmpty(cl))
+                    return cl;
+            }
+        }
+        catch { /* WMI may fail for protected processes */ }
+        return "";
+    }
+}

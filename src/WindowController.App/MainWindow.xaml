@@ -1,0 +1,95 @@
+﻿<Window x:Class="WindowController.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Window-Controller" Height="720" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="180"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Header -->
+        <TextBlock Grid.Row="0" Text="起動中ウィンドウ（チェックしてプロファイル保存）" FontSize="13" Margin="0,0,0,4"/>
+
+        <!-- Row 1: Window list -->
+        <ListView Grid.Row="1" x:Name="lvWindows" ItemsSource="{Binding Windows}" Margin="0,0,0,4"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Width="40">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsChecked}" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Title" Width="300" DisplayMemberBinding="{Binding Title}"/>
+                    <GridViewColumn Header="Exe" Width="120" DisplayMemberBinding="{Binding Exe}"/>
+                    <GridViewColumn Header="Class" Width="130" DisplayMemberBinding="{Binding Class}"/>
+                    <GridViewColumn Header="URL" Width="220" DisplayMemberBinding="{Binding Url}"/>
+                    <GridViewColumn Header="Profile" Width="100" DisplayMemberBinding="{Binding BrowserProfile}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- Row 2: Buttons + profile name -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,4">
+            <Button Content="更新" Width="80" Command="{Binding RefreshWindowsCommand}" Margin="0,0,8,0"/>
+            <TextBlock Text="プロファイル名:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+            <TextBox x:Name="txtProfileName" Text="{Binding ProfileName, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,8,0"/>
+            <Button Content="チェックを保存" Width="130" Command="{Binding SaveProfileCommand}"/>
+        </StackPanel>
+
+        <!-- Row 3: Separator -->
+        <Separator Grid.Row="3" Margin="0,4"/>
+
+        <!-- Row 4: Profile list header -->
+        <TextBlock Grid.Row="4" Text="保存済みプロファイル（チェック=最小化/最大化を常時連動）" FontSize="13" Margin="0,4,0,4"/>
+
+        <!-- Row 5: Profile list -->
+        <ListView Grid.Row="5" x:Name="lvProfiles" ItemsSource="{Binding Profiles}"
+                  SelectedItem="{Binding SelectedProfile}" Margin="0,0,0,4">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Width="40">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding SyncMinMax}" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Profile" Width="460" DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn Header="Windows" Width="80" DisplayMemberBinding="{Binding WindowCount}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- Row 6: Action buttons -->
+        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,4,0,4">
+            <Button Content="適用（配置のみ）" Width="160" Command="{Binding ApplyProfileCommand}" Margin="0,0,8,0"/>
+            <Button Content="一括起動＋配置" Width="160" Command="{Binding LaunchAndApplyProfileCommand}" Margin="0,0,8,0"/>
+            <Button Content="削除" Width="100" Command="{Binding DeleteProfileCommand}"/>
+        </StackPanel>
+
+        <!-- Row 7: Settings checkboxes -->
+        <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="0,4,0,4">
+            <CheckBox Content="連動機能を有効にする（全体）" IsChecked="{Binding SyncEnabled}" Margin="0,0,16,0"/>
+            <CheckBox Content="起動時にGUIを表示する（OFF=タスクトレイ常駐のみ）" IsChecked="{Binding ShowGuiOnStartup}"/>
+        </StackPanel>
+
+        <!-- Row 8: Status bar -->
+        <TextBlock Grid.Row="8" Text="{Binding StatusText}" Margin="0,4,0,0" Foreground="DarkBlue"/>
+    </Grid>
+</Window>
