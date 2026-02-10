@@ -121,3 +121,6 @@ appsettings.*.json
 
 # Publish
 publish/
+
+# Release artifacts
+dist/

@@ -139,6 +139,17 @@ dotnet publish WindowController.App -c Release
 # 出力先: src/WindowController.App/bin/Release/net8.0-windows/win-x64/publish/
 ```
 
+## 配布用ZIPの生成
+
+配布用のZIP（中身は `WindowController.exe` のみ）をリポジトリ直下の `dist/` に出力します。
+
+```powershell
+pwsh scripts/package.ps1
+```
+
+- 出力: `dist/WindowController-v<version>-win-x64.zip`
+- publish出力（確認用）: `dist/publish/WindowController.exe`
+
 ### 必要環境
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 以上
