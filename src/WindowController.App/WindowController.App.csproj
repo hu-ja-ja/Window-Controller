@@ -10,9 +10,6 @@
     <!-- Assembly / Version -->
     <AssemblyName>WindowController</AssemblyName>
     <RootNamespace>WindowController.App</RootNamespace>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
     <Product>Window-Controller</Product>
     <Description>Window arrangement manager – save and restore window layouts with profile-based management.</Description>
     <Authors>hu-ja-ja</Authors>

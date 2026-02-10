@@ -10,25 +10,29 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $srcDir = Join-Path $repoRoot 'src'
 $appProj = Join-Path $srcDir 'WindowController.App\WindowController.App.csproj'
+$propsPath = Join-Path $srcDir 'Directory.Build.props'
 
 if (-not (Test-Path $appProj)) {
     throw "Project not found: $appProj"
 }
 
-# Read version from csproj
-[xml]$xml = Get-Content $appProj -Raw
-$versionNode = $xml.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1
-$version = if ($null -eq $versionNode) {
-    '0.0.0'
+# Read version from Directory.Build.props (fallback: csproj)
+function Get-VersionFromMsbuildXml([string]$path) {
+    if (-not (Test-Path $path)) { return $null }
+    [xml]$xml = Get-Content $path -Raw
+    $versionNode = $xml.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1
+    if ($null -eq $versionNode) { return $null }
+    if ($versionNode -is [string]) { return $versionNode.Trim() }
+    if ($versionNode.PSObject.Properties.Name -contains '#text') { return (($versionNode.'#text' ?? '').Trim()) }
+    return $versionNode.ToString().Trim()
 }
-elseif ($versionNode -is [string]) {
-    $versionNode.Trim()
+
+$version = (Get-VersionFromMsbuildXml $propsPath)
+if (-not $version) {
+    $version = (Get-VersionFromMsbuildXml $appProj)
 }
-elseif ($versionNode.PSObject.Properties.Name -contains '#text') {
-    ($versionNode.'#text' ?? '').Trim()
-}
-else {
-    $versionNode.ToString().Trim()
+if (-not $version) {
+    $version = '0.0.0'
 }
 
 $distDir = Join-Path $repoRoot 'dist'
