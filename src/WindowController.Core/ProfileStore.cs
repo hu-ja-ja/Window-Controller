@@ -62,7 +62,16 @@ public class ProfileStore
         {
             var json = File.ReadAllText(_filePath);
             var parsed = JsonSerializer.Deserialize<ProfilesRoot>(json, JsonOptions);
-            Data = NormalizeData(parsed ?? new ProfilesRoot());
+            var normalized = NormalizeData(parsed ?? new ProfilesRoot());
+
+            // Check if any profile received a new Id during normalization (migration)
+            bool needsSave = json != null && normalized.Profiles.Any(p =>
+                !json.Contains($"\"id\": \"{p.Id}\"", StringComparison.Ordinal));
+
+            Data = normalized;
+
+            if (needsSave)
+                Save();
         }
         catch (Exception ex)
         {
@@ -101,9 +110,15 @@ public class ProfileStore
     public Profile? FindByName(string name)
         => Data.Profiles.FirstOrDefault(p => p.Name == name);
 
+    public Profile? FindById(string id)
+        => Data.Profiles.FirstOrDefault(p => p.Id == id);
+
     public void SaveProfile(Profile profile)
     {
-        var idx = Data.Profiles.FindIndex(p => p.Name == profile.Name);
+        // Prefer Id-based lookup when the profile has a valid Id
+        var idx = !string.IsNullOrEmpty(profile.Id)
+            ? Data.Profiles.FindIndex(p => p.Id == profile.Id)
+            : Data.Profiles.FindIndex(p => p.Name == profile.Name);
         if (idx >= 0)
             Data.Profiles[idx] = profile;
         else
@@ -119,6 +134,47 @@ public class ProfileStore
         return removed;
     }
 
+    public bool DeleteProfileById(string id)
+    {
+        var removed = Data.Profiles.RemoveAll(p => p.Id == id) > 0;
+        if (removed)
+            Save();
+        return removed;
+    }
+
+    /// <summary>
+    /// Rename a profile identified by <paramref name="profileId"/>.
+    /// If <paramref name="desiredName"/> conflicts with another profile,
+    /// a numeric suffix like "(2)" is appended automatically.
+    /// Returns the final (possibly adjusted) name, or null when the profile was not found.
+    /// </summary>
+    public string? RenameProfile(string profileId, string desiredName)
+    {
+        var profile = FindById(profileId);
+        if (profile == null) return null;
+
+        var finalName = ResolveUniqueName(desiredName, profileId);
+        profile.Name = finalName;
+        profile.UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss");
+        Save();
+        return finalName;
+    }
+
+    /// <summary>
+    /// Returns a name that does not collide with existing profiles (excluding the one with <paramref name="excludeId"/>).
+    /// </summary>
+    internal string ResolveUniqueName(string desiredName, string? excludeId = null)
+    {
+        var candidate = desiredName;
+        int suffix = 2;
+        while (Data.Profiles.Any(p => p.Name == candidate && p.Id != excludeId))
+        {
+            candidate = $"{desiredName} ({suffix})";
+            suffix++;
+        }
+        return candidate;
+    }
+
     private static ProfilesRoot CreateDefault() => new()
     {
         Version = 1,
@@ -129,6 +185,18 @@ public class ProfileStore
     private static ProfilesRoot NormalizeData(ProfilesRoot root)
     {
         root.Version = root.Version == 0 ? 1 : root.Version;
+
+        // Assign stable Ids to profiles that lack one (migration from older schema)
+        var seenIds = new HashSet<string>();
+        foreach (var p in root.Profiles)
+        {
+            if (string.IsNullOrEmpty(p.Id) || !seenIds.Add(p.Id))
+            {
+                // Generate a new unique Id (duplicate Ids are also re-assigned)
+                p.Id = Guid.NewGuid().ToString("D");
+                seenIds.Add(p.Id);
+            }
+        }
 
         foreach (var p in root.Profiles)
         {

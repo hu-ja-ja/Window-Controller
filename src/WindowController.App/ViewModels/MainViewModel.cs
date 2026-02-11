@@ -31,7 +31,8 @@ public partial class WindowItem : ObservableObject
 public partial class ProfileItem : ObservableObject
 {
     [ObservableProperty] private bool _syncMinMax;
-    public string Name { get; init; } = "";
+    [ObservableProperty] private string _name = "";
+    public string Id { get; init; } = "";
     public int WindowCount { get; init; }
 }
 
@@ -143,6 +144,7 @@ public partial class MainViewModel : ObservableObject
 
             var profile = existing ?? new Profile
             {
+                Id = Guid.NewGuid().ToString("D"),
                 Name = name,
                 CreatedAt = now,
                 SyncMinMax = 0
@@ -239,7 +241,7 @@ public partial class MainViewModel : ObservableObject
             StatusText = "プロファイルを選択してください。";
             return;
         }
-        await DoApplyAsync(SelectedProfile.Name, false);
+        await DoApplyAsync(SelectedProfile.Id, false);
     }
 
     [RelayCommand]
@@ -250,19 +252,21 @@ public partial class MainViewModel : ObservableObject
             StatusText = "プロファイルを選択してください。";
             return;
         }
-        await DoApplyAsync(SelectedProfile.Name, true);
+        await DoApplyAsync(SelectedProfile.Id, true);
     }
 
-    private async Task DoApplyAsync(string profileName, bool launchMissing)
+    private async Task DoApplyAsync(string profileId, bool launchMissing)
     {
         try
         {
-            var profile = _store.FindByName(profileName);
+            var profile = _store.FindById(profileId);
             if (profile == null)
             {
-                StatusText = $"プロファイルが見つかりません: {profileName}";
+                StatusText = $"プロファイルが見つかりません";
                 return;
             }
+
+            var profileName = profile.Name;
 
             var candidates = GetCandidates();
             int applied = 0;
@@ -405,7 +409,7 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        if (_store.DeleteProfile(name))
+        if (_store.DeleteProfileById(SelectedProfile.Id))
         {
             ReloadProfiles();
             _syncManager.ScheduleRebuild();
@@ -424,29 +428,61 @@ public partial class MainViewModel : ObservableObject
         {
             var item = new ProfileItem
             {
+                Id = p.Id,
                 Name = p.Name,
                 SyncMinMax = p.SyncMinMax != 0,
                 WindowCount = p.Windows.Count
             };
             item.PropertyChanged += (s, e) =>
             {
-                if (e.PropertyName == nameof(ProfileItem.SyncMinMax) && s is ProfileItem pi)
+                if (s is not ProfileItem pi) return;
+                if (e.PropertyName == nameof(ProfileItem.SyncMinMax))
                     OnProfileSyncChanged(pi);
+                else if (e.PropertyName == nameof(ProfileItem.Name))
+                    OnProfileNameChanged(pi);
             };
             Profiles.Add(item);
         }
     }
 
+    private void OnProfileNameChanged(ProfileItem pi)
+    {
+        var newName = pi.Name?.Trim();
+        if (string.IsNullOrEmpty(newName))
+        {
+            // Revert to current stored name
+            var current = _store.FindById(pi.Id);
+            if (current != null)
+                pi.Name = current.Name;
+            StatusText = "プロファイル名を空にすることはできません。";
+            return;
+        }
+
+        var finalName = _store.RenameProfile(pi.Id, newName);
+        if (finalName == null)
+        {
+            StatusText = "プロファイルが見つかりません。";
+            return;
+        }
+
+        // If the name was adjusted due to conflict, update the UI
+        if (finalName != newName)
+            pi.Name = finalName;
+
+        _syncManager.ScheduleRebuild();
+        StatusText = $"名前を変更しました: {finalName}";
+    }
+
     private void OnProfileSyncChanged(ProfileItem pi)
     {
-        var profile = _store.FindByName(pi.Name);
+        var profile = _store.FindById(pi.Id);
         if (profile != null)
         {
             profile.SyncMinMax = pi.SyncMinMax ? 1 : 0;
             _store.SaveProfile(profile);
             // UpdateHooksIfNeeded already schedules a rebuild internally
             _syncManager.UpdateHooksIfNeeded();
-            StatusText = $"連動設定({pi.Name}): {(pi.SyncMinMax ? "ON" : "OFF")}";
+            StatusText = $"連動設定({profile.Name}): {(pi.SyncMinMax ? "ON" : "OFF")}";
         }
     }
 
