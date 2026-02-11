@@ -62,15 +62,16 @@ public class ProfileStore
         {
             var json = File.ReadAllText(_filePath);
             var parsed = JsonSerializer.Deserialize<ProfilesRoot>(json, JsonOptions);
+            
+            // Detect migration need before normalization
+            bool needsMigration = parsed != null && parsed.Profiles.Any(p => 
+                string.IsNullOrEmpty(p.Id) || 
+                parsed.Profiles.Count(x => x.Id == p.Id) > 1);
+            
             var normalized = NormalizeData(parsed ?? new ProfilesRoot());
-
-            // Check if any profile received a new Id during normalization (migration)
-            bool needsSave = json != null && normalized.Profiles.Any(p =>
-                !json.Contains($"\"id\": \"{p.Id}\"", StringComparison.Ordinal));
-
             Data = normalized;
 
-            if (needsSave)
+            if (needsMigration)
                 Save();
         }
         catch (Exception ex)
@@ -153,7 +154,13 @@ public class ProfileStore
         var profile = FindById(profileId);
         if (profile == null) return null;
 
-        var finalName = ResolveUniqueName(desiredName, profileId);
+        var trimmed = desiredName.Trim();
+        var finalName = ResolveUniqueName(trimmed, profileId);
+        
+        // Skip save if the name hasn't actually changed
+        if (finalName == profile.Name)
+            return finalName;
+        
         profile.Name = finalName;
         profile.UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss");
         Save();
