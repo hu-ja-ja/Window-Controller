@@ -25,6 +25,18 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="24,0,24,16">
 
+                <!-- Settings entry point -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+                    <ui:Button Appearance="Secondary" Click="SettingsButton_Click" Padding="12,6">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="Settings24" />
+                        </ui:Button.Icon>
+                        <ui:Button.Content>
+                            <TextBlock Text="設定…"/>
+                        </ui:Button.Content>
+                    </ui:Button>
+                </StackPanel>
+
                 <!-- ═══════ Section 1 : Running Windows ═══════ -->
                 <TextBlock Text="起動中ウィンドウ" Style="{StaticResource SectionHeader}"/>
                 <TextBlock Text="チェックしたウィンドウをプロファイルに保存できます" Style="{StaticResource SectionDescription}"/>
@@ -40,7 +52,7 @@
                         <!-- Refresh button -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                             <ui:Button Appearance="Info" Command="{Binding RefreshWindowsCommand}" Margin="0,0,12,0"
-                                       Background="#0280b5" BorderBrush="#0280b5">
+                                       >
                                 <ui:Button.Icon>
                                     <ui:SymbolIcon Symbol="ArrowSync24" />
                                 </ui:Button.Icon>
@@ -114,7 +126,7 @@
                                         Text="{Binding ProfileName, UpdateSourceTrigger=PropertyChanged}"
                                         Margin="0,0,12,0"/>
                             <ui:Button Grid.Column="2" Appearance="Success" Command="{Binding SaveProfileCommand}"
-                                       Background="#3c8840" BorderBrush="#3c8840">
+                                       >
                                 <ui:Button.Icon>
                                     <ui:SymbolIcon Symbol="Save24" />
                                 </ui:Button.Icon>
@@ -187,7 +199,7 @@
                         <!-- Action buttons -->
                         <StackPanel Grid.Row="1" Orientation="Horizontal">
                             <ui:Button Appearance="Info" Command="{Binding ApplyProfileCommand}" Margin="0,0,8,0"
-                                       Background="#0280b5" BorderBrush="#0280b5">
+                                       >
                                 <ui:Button.Icon>
                                     <ui:SymbolIcon Symbol="Checkmark24" />
                                 </ui:Button.Icon>
@@ -196,7 +208,7 @@
                                 </ui:Button.Content>
                             </ui:Button>
                             <ui:Button Appearance="Info" Command="{Binding LaunchAndApplyProfileCommand}" Margin="0,0,8,0"
-                                       Background="#0280b5" BorderBrush="#0280b5">
+                                       >
                                 <ui:Button.Icon>
                                     <ui:SymbolIcon Symbol="Rocket24" />
                                 </ui:Button.Icon>
@@ -204,8 +216,7 @@
                                     <TextBlock Text="一括起動＋配置"/>
                                 </ui:Button.Content>
                             </ui:Button>
-                            <ui:Button Appearance="Danger" Command="{Binding DeleteProfileCommand}"
-                                       Background="#b8180c" BorderBrush="#b8180c">
+                            <ui:Button Appearance="Danger" Command="{Binding DeleteProfileCommand}">
                                 <ui:Button.Icon>
                                     <ui:SymbolIcon Symbol="Delete24" />
                                 </ui:Button.Icon>
@@ -215,81 +226,6 @@
                             </ui:Button>
                         </StackPanel>
                     </Grid>
-                </Border>
-
-                <!-- ═══════ Section 3 : Settings ═══════ -->
-                <TextBlock Text="設定" Style="{StaticResource SectionHeader}"/>
-
-                <Border Style="{StaticResource SectionCard}">
-                    <StackPanel>
-                        <!-- Sync toggle row -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="連動機能を有効にする" FontSize="14"/>
-                                <TextBlock Text="最小化 / 最大化の連動を全体で有効にします"
-                                           Style="{StaticResource SettingDescription}"/>
-                            </StackPanel>
-                            <CheckBox Grid.Column="1" IsChecked="{Binding SyncEnabled}" VerticalAlignment="Center"
-                                      Style="{StaticResource AccentCheckBox}"/>
-                        </Grid>
-
-                        <Separator Margin="0,0,0,10" Opacity="0.3"/>
-
-                        <!-- Show GUI on startup row -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="起動時にGUIを表示する" FontSize="14"/>
-                                <TextBlock Text="OFFの場合はタスクトレイ常駐のみ"
-                                           Style="{StaticResource SettingDescription}"/>
-                            </StackPanel>
-                            <CheckBox Grid.Column="1" IsChecked="{Binding ShowGuiOnStartup}" VerticalAlignment="Center"
-                                      Style="{StaticResource AccentCheckBox}"/>
-                        </Grid>
-
-                        <Separator Margin="0,0,0,10" Opacity="0.3"/>
-
-                        <!-- Profiles path row -->
-                        <StackPanel>
-                            <TextBlock Text="プロファイルの保存先" FontSize="14" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <ui:TextBox Grid.Column="0"
-                                            Text="{Binding ProfilesPathDisplay, Mode=OneWay}"
-                                            IsReadOnly="True"
-                                            PlaceholderText="保存先パス"
-                                            ToolTip="{Binding ProfilesPathDisplay}"
-                                            Margin="0,0,8,0"/>
-                                <ui:Button Grid.Column="1" Appearance="Secondary" Command="{Binding BrowseProfilesPathCommand}" Margin="0,0,8,0">
-                                    <ui:Button.Icon>
-                                        <ui:SymbolIcon Symbol="FolderOpen24" />
-                                    </ui:Button.Icon>
-                                    <ui:Button.Content>
-                                        <TextBlock Text="変更…"/>
-                                    </ui:Button.Content>
-                                </ui:Button>
-                                <ui:Button Grid.Column="2" Appearance="Secondary" Command="{Binding ResetProfilesPathCommand}">
-                                    <ui:Button.Icon>
-                                        <ui:SymbolIcon Symbol="ArrowCounterclockwise24" />
-                                    </ui:Button.Icon>
-                                    <ui:Button.Content>
-                                        <TextBlock Text="既定に戻す"/>
-                                    </ui:Button.Content>
-                                </ui:Button>
-                            </Grid>
-                        </StackPanel>
-                    </StackPanel>
                 </Border>
 
             </StackPanel>

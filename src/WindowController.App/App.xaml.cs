@@ -18,9 +18,14 @@ public partial class App : Application
     private static Mutex? _singleInstanceMutex;
     private TaskbarIcon? _trayIcon;
     private MainWindow? _mainWindow;
+    private SettingsWindow? _settingsWindow;
     private MainViewModel? _viewModel;
+    private SettingsViewModel? _settingsViewModel;
     private SyncManager? _syncManager;
     private HotkeyManager? _hotkeyManager;
+    private ProfileApplier? _profileApplier;
+    private ProfileStore? _profileStore;
+    private AppSettingsStore? _appSettingsStore;
     private ILogger? _log;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -62,23 +67,26 @@ public partial class App : Application
             _log.Information("Window-Controller starting");
 
             // Load app-level settings (profiles path etc.)
-            var appSettings = new AppSettingsStore(appSettingsPath, defaultProfilesPath, _log);
-            appSettings.Load();
+            _appSettingsStore = new AppSettingsStore(appSettingsPath, defaultProfilesPath, _log);
+            _appSettingsStore.Load();
 
-            var profilesPath = appSettings.EffectiveProfilesPath;
+            var profilesPath = _appSettingsStore.EffectiveProfilesPath;
             _log.Information("Profiles path: {Path}", profilesPath);
 
             // Core services
-            var store = new ProfileStore(profilesPath, _log);
-            store.Load();
+            _profileStore = new ProfileStore(profilesPath, _log);
+            _profileStore.Load();
 
             var urlRetriever = new BrowserUrlRetriever(_log);
             var enumerator = new WindowEnumerator(_log, (hwnd, exe) => urlRetriever.TryGetUrl(hwnd, exe));
             var arranger = new WindowArranger(_log);
             var hookManager = new WinEventHookManager(_log);
-            _syncManager = new SyncManager(store, enumerator, hookManager, _log);
+            _syncManager = new SyncManager(_profileStore, enumerator, hookManager, _log);
 
-            _viewModel = new MainViewModel(store, enumerator, arranger, urlRetriever, _syncManager, appSettings, _log);
+            // Profile applier for hotkey access
+            _profileApplier = new ProfileApplier(_profileStore, enumerator, arranger, _syncManager, _log);
+
+            _viewModel = new MainViewModel(_profileStore, enumerator, arranger, urlRetriever, _syncManager, _appSettingsStore, _log);
             _viewModel.Initialize();
 
             // Start sync hooks if enabled
@@ -87,6 +95,7 @@ public partial class App : Application
             // Create main window
             _mainWindow = new MainWindow();
             _mainWindow.DataContext = _viewModel;
+            _mainWindow.SettingsRequested += (_, _) => ShowSettingsWindow();
 
             // Apply WPF-UI theme (follow system dark/light)
             ApplicationThemeManager.Apply(ApplicationTheme.Dark, Wpf.Ui.Controls.WindowBackdropType.Mica);
@@ -99,13 +108,15 @@ public partial class App : Application
             // Setup tray icon
             SetupTrayIcon();
 
-            // Setup hotkey (Ctrl+Alt+W)
+            // Setup hotkey manager
             _hotkeyManager = new HotkeyManager(_log);
-            // We need an HWND for hotkey registration; use a helper window
-            _hotkeyManager.Register(() => ShowMainWindow());
+            RegisterAllHotkeys();
+
+            // Create settings window (lazily shown)
+            CreateSettingsWindow();
 
             // Show GUI if setting says so
-            if (store.Data.Settings.ShowGuiOnStartup != 0)
+            if (_profileStore.Data.Settings.ShowGuiOnStartup != 0)
                 ShowMainWindow();
         }
         catch (Exception ex)
@@ -113,6 +124,73 @@ public partial class App : Application
             MessageBox.Show($"初期化に失敗しました。\n{ex.Message}", "Window-Controller", MessageBoxButton.OK, MessageBoxImage.Error);
             Log.Error(ex, "Startup failed");
             Shutdown();
+        }
+    }
+
+    private void CreateSettingsWindow()
+    {
+        if (_profileStore == null || _appSettingsStore == null || _hotkeyManager == null || _syncManager == null || _log == null)
+            return;
+
+        _settingsViewModel = new SettingsViewModel(
+            _profileStore,
+            _appSettingsStore,
+            _hotkeyManager,
+            _syncManager,
+            _log,
+            refreshHotkeysCallback: RegisterAllHotkeys,
+            applyProfileCallback: async (profileId, launchMissing) =>
+            {
+                if (_profileApplier != null)
+                    await _profileApplier.ApplyByIdAsync(profileId, launchMissing);
+            });
+
+        _settingsWindow = new SettingsWindow();
+        _settingsWindow.DataContext = _settingsViewModel;
+    }
+
+    private void RegisterAllHotkeys()
+    {
+        if (_hotkeyManager == null || _appSettingsStore == null || _profileApplier == null)
+            return;
+
+        // Unregister all profile hotkeys first
+        _hotkeyManager.UnregisterAllProfileHotkeys();
+
+        // Register GUI hotkey
+        var guiHotkey = _appSettingsStore.Data.Hotkeys.ShowGui;
+        if (!guiHotkey.IsEmpty)
+        {
+            _hotkeyManager.UpdateGuiHotkey(guiHotkey, () => ShowMainWindow());
+        }
+        else
+        {
+            _hotkeyManager.UpdateGuiHotkey(new Core.Models.HotkeyBinding(), () => { });
+        }
+
+        // Register profile hotkeys
+        foreach (var (profileId, binding) in _appSettingsStore.Data.Hotkeys.Profiles)
+        {
+            if (binding.IsEmpty) continue;
+
+            var capturedProfileId = profileId;
+            _hotkeyManager.RegisterProfileHotkey(profileId, binding, () =>
+            {
+                // Apply profile on hotkey press (arrange only, no launch)
+                _ = Dispatcher.InvokeAsync(async () =>
+                {
+                    if (_profileApplier != null)
+                    {
+                        var result = await _profileApplier.ApplyByIdAsync(capturedProfileId, false);
+                        var profile = _profileStore?.FindById(capturedProfileId);
+                        var name = profile?.Name ?? capturedProfileId;
+                        if (_viewModel != null)
+                        {
+                            _viewModel.StatusText = result.ToStatusMessage(name);
+                        }
+                    }
+                });
+            });
         }
     }
 
@@ -130,7 +208,14 @@ public partial class App : Application
         menuOpen.Click += (_, _) => ShowMainWindow();
         contextMenu.Items.Add(menuOpen);
 
+        var menuSettings = new System.Windows.Controls.MenuItem { Header = "設定…" };
+        menuSettings.Click += (_, _) => ShowSettingsWindow();
+        contextMenu.Items.Add(menuSettings);
+
+        contextMenu.Items.Add(new System.Windows.Controls.Separator());
+
         var menuApply = new System.Windows.Controls.MenuItem { Header = "プロファイルを適用(配置のみ)" };
+        // TODO: Add submenu for profile selection if needed
         menuApply.Click += (_, _) => ShowMainWindow();
         contextMenu.Items.Add(menuApply);
 
@@ -151,6 +236,18 @@ public partial class App : Application
         _mainWindow.Show();
         _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Activate();
+    }
+
+    private void ShowSettingsWindow()
+    {
+        if (_settingsWindow == null) return;
+
+        // Refresh profile list in settings
+        _settingsViewModel?.RefreshProfiles();
+
+        _settingsWindow.Show();
+        _settingsWindow.WindowState = WindowState.Normal;
+        _settingsWindow.Activate();
     }
 
     private void ExitApp()
