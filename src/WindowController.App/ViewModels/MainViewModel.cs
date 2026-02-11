@@ -462,9 +462,8 @@ public partial class MainViewModel : ObservableObject
 
         // If the name has not actually changed compared to the store, ignore.
         if (string.Equals(current.Name, pi.Name, StringComparison.Ordinal))
-        {
             return;
-        }
+
 
         var newName = pi.Name?.Trim();
         if (string.IsNullOrEmpty(newName))
