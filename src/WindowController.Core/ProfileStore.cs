@@ -72,7 +72,7 @@ public class ProfileStore
                 var bak = $"{_filePath}.broken.{DateTime.Now:yyyyMMdd_HHmmss}";
                 File.Move(_filePath, bak);
             }
-            catch { /* best effort */ }
+            catch (Exception ex2) { _log.Warning(ex2, "Failed to rename broken config file"); }
             Data = CreateDefault();
             Save();
         }

@@ -175,7 +175,7 @@ public partial class MainViewModel : ObservableObject
             {
                 url = _urlRetriever.TryGetUrl(w.Hwnd, w.Exe);
             }
-            catch { /* best effort */ }
+            catch (Exception ex) { _log.Debug(ex, "URL retrieval failed for hwnd {Hwnd}", w.Hwnd); }
 
             var urlKey = UrlNormalizer.Normalize(url);
 
@@ -232,28 +232,28 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ApplyProfile()
+    private async Task ApplyProfile()
     {
         if (SelectedProfile == null)
         {
             StatusText = "プロファイルを選択してください。";
             return;
         }
-        DoApply(SelectedProfile.Name, false);
+        await DoApplyAsync(SelectedProfile.Name, false);
     }
 
     [RelayCommand]
-    private void LaunchAndApplyProfile()
+    private async Task LaunchAndApplyProfile()
     {
         if (SelectedProfile == null)
         {
             StatusText = "プロファイルを選択してください。";
             return;
         }
-        DoApply(SelectedProfile.Name, true);
+        await DoApplyAsync(SelectedProfile.Name, true);
     }
 
-    private void DoApply(string profileName, bool launchMissing)
+    private async Task DoApplyAsync(string profileName, bool launchMissing)
     {
         try
         {
@@ -277,7 +277,7 @@ public partial class MainViewModel : ObservableObject
 
                     if ((hwnd == 0 || !NativeMethods.IsWindow(hwnd)) && launchMissing)
                     {
-                        hwnd = LaunchAndWait(entry, candidates);
+                        hwnd = await LaunchAndWaitAsync(entry, candidates);
                     }
 
                     if (hwnd == 0 || !NativeMethods.IsWindow(hwnd))
@@ -309,7 +309,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private nint LaunchAndWait(WindowEntry entry, List<WindowCandidate> existingCandidates)
+    private async Task<nint> LaunchAndWaitAsync(WindowEntry entry, List<WindowCandidate> existingCandidates)
     {
         var exe = entry.Match.Exe;
         var url = entry.Match.Url;
@@ -322,9 +322,22 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var startPath = !string.IsNullOrEmpty(path) && File.Exists(path) ? path : exe;
+
             var psi = new ProcessStartInfo(startPath);
             if (!string.IsNullOrEmpty(url))
-                psi.Arguments = $"\"{url}\"";
+            {
+                // Only allow http/https/file URLs as arguments
+                if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                    url.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+                {
+                    psi.Arguments = $"\"{url}\"";
+                }
+                else
+                {
+                    _log.Warning("Launch skipped URL argument with unsupported scheme: {Url}", url);
+                }
+            }
             psi.UseShellExecute = true;
             Process.Start(psi);
         }
@@ -338,7 +351,7 @@ public partial class MainViewModel : ObservableObject
         var sw = Stopwatch.StartNew();
         while (sw.ElapsedMilliseconds < 12000)
         {
-            Thread.Sleep(300);
+            await Task.Delay(300);
             var wins = _enumerator.EnumerateWindows();
             foreach (var w in wins)
             {

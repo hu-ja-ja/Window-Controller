@@ -21,7 +21,7 @@ public static class PathNormalizer
         // UNC: \\\\server\\share -> \\server\share
         if (path.StartsWith("\\\\"))
         {
-            var tail = path[2..];
+            var tail = path.TrimStart('\\');
             while (tail.Contains("\\\\"))
                 tail = tail.Replace("\\\\", "\\");
             return "\\\\" + tail;

@@ -233,7 +233,7 @@ public class SyncManager : IDisposable
                 _lastMinMaxByHwnd[target] = mm;
                 count++;
             }
-            catch { /* skip */ }
+            catch (Exception ex) { _log.Debug(ex, "PropagateMinMax failed for target {Target}", target); }
         }
         if (count > 0)
             _log.Information("Sync propagated within profile '{Name}' to {Count} window(s)", profileName, count);
@@ -264,7 +264,7 @@ public class SyncManager : IDisposable
                     NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
                 count++;
             }
-            catch { /* skip */ }
+            catch (Exception ex) { _log.Debug(ex, "PropagateForeground failed for target {Target}", target); }
         }
         if (count > 0)
             _log.Information("Foreground sync within profile '{Name}' to {Count} window(s)", profileName, count);

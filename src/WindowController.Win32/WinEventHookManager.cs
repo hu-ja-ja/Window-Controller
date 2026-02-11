@@ -58,7 +58,7 @@ public class WinEventHookManager : IDisposable
         foreach (var h in _hookHandles)
         {
             try { NativeMethods.UnhookWinEvent(h); }
-            catch { /* best effort */ }
+            catch (Exception ex) { _log.Debug(ex, "UnhookWinEvent failed for handle {Handle}", h); }
         }
         _hookHandles.Clear();
         _callback = null;

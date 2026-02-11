@@ -26,6 +26,18 @@ public record MatchResult(nint Hwnd, int Score, bool IsAmbiguous);
 /// </summary>
 public static class WindowMatcher
 {
+    // ── Scoring constants ──
+    private const int ScorePath = 60;
+    private const int ScoreTitleExact = 30;
+    private const int ScoreTitlePartial = 10;
+    private const int ScoreBrowserUserDataDir = 70;
+    private const int ScoreBrowserProfileDir = 50;
+    private const int ScoreUrlExact = 60;
+    private const int ScoreUrlHostOnly = 20;
+    private const int AmbiguityGap = 10;
+    private const int AmbiguityMinScore = 50;
+    private const int SingleMatchScore = 100;
+
     /// <summary>
     /// Find the best matching window from candidates for a given entry.
     /// Returns null if no candidate matches the required criteria (exe+class).
@@ -63,7 +75,7 @@ public static class WindowMatcher
             return null;
 
         if (filtered.Count == 1 && !forSync)
-            return new MatchResult(filtered[0].Cand.Hwnd, 100, false);
+            return new MatchResult(filtered[0].Cand.Hwnd, SingleMatchScore, false);
 
         // Phase 2: scoring
         var scored = new List<(WindowCandidate Cand, int Score)>();
@@ -75,15 +87,15 @@ public static class WindowMatcher
             if (!string.IsNullOrEmpty(entry.Path) && !string.IsNullOrEmpty(c.Path) &&
                 string.Equals(PathNormalizer.Normalize(c.Path), PathNormalizer.Normalize(entry.Path),
                     StringComparison.OrdinalIgnoreCase))
-                score += 60;
+                score += ScorePath;
 
             // Title match
             if (!string.IsNullOrEmpty(entry.Match.Title))
             {
                 if (c.Title == entry.Match.Title)
-                    score += 30;
+                    score += ScoreTitleExact;
                 else if (c.Title.Contains(entry.Match.Title, StringComparison.Ordinal))
-                    score += 10;
+                    score += ScoreTitlePartial;
             }
 
             // Browser identity match
@@ -95,18 +107,18 @@ public static class WindowMatcher
                     // Chromium
                     if (!string.IsNullOrEmpty(wantBrowser.UserDataDir) && !string.IsNullOrEmpty(candIdent.UserDataDir) &&
                         string.Equals(wantBrowser.UserDataDir, candIdent.UserDataDir, StringComparison.OrdinalIgnoreCase))
-                        score += 70;
+                        score += ScoreBrowserUserDataDir;
                     if (!string.IsNullOrEmpty(wantBrowser.ProfileDirectory) && !string.IsNullOrEmpty(candIdent.ProfileDirectory) &&
                         wantBrowser.ProfileDirectory == candIdent.ProfileDirectory)
-                        score += 50;
+                        score += ScoreBrowserProfileDir;
 
                     // Firefox
                     if (!string.IsNullOrEmpty(wantBrowser.ProfileDir) && !string.IsNullOrEmpty(candIdent.ProfileDir) &&
                         string.Equals(wantBrowser.ProfileDir, candIdent.ProfileDir, StringComparison.OrdinalIgnoreCase))
-                        score += 70;
+                        score += ScoreBrowserUserDataDir;
                     if (!string.IsNullOrEmpty(wantBrowser.ProfileName) && !string.IsNullOrEmpty(candIdent.ProfileName) &&
                         wantBrowser.ProfileName == candIdent.ProfileName)
-                        score += 50;
+                        score += ScoreBrowserProfileDir;
                 }
             }
 
@@ -117,9 +129,9 @@ public static class WindowMatcher
                 if (!string.IsNullOrEmpty(candUrlKey))
                 {
                     if (candUrlKey == wantUrlKey)
-                        score += 60;
+                        score += ScoreUrlExact;
                     else if (!string.IsNullOrEmpty(wantHost) && UrlNormalizer.GetHost(candUrlKey) == wantHost)
-                        score += 20;
+                        score += ScoreUrlHostOnly;
                 }
             }
 
@@ -135,7 +147,7 @@ public static class WindowMatcher
         if (scored.Count > 1)
         {
             var second = scored[1];
-            if (best.Score - second.Score <= 10 && best.Score < 50)
+            if (best.Score - second.Score <= AmbiguityGap && best.Score < AmbiguityMinScore)
                 ambiguous = true;
         }
 

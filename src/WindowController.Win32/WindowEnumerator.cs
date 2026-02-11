@@ -97,7 +97,7 @@ public class WindowEnumerator
                         if (_urlGetter != null)
                             url = _urlGetter(hwnd, exe);
                     }
-                    catch { /* best effort */ }
+                    catch (Exception ex) { _log.Debug(ex, "URL retrieval failed for hwnd {Hwnd}", hwnd); }
                 }
 
                 var browserProfile = "";
@@ -199,7 +199,7 @@ public class WindowEnumerator
             using var proc = Process.GetProcessById((int)pid);
             return proc.ProcessName + ".exe";
         }
-        catch { return ""; }
+        catch { return ""; } // Expected for protected/exited processes
     }
 
     public static string GetProcessPath(uint pid)
@@ -233,7 +233,7 @@ public class WindowEnumerator
                     return cl;
             }
         }
-        catch { /* WMI may fail for protected processes */ }
+        catch { /* WMI may fail for protected/system processes — expected */ }
         return "";
     }
 

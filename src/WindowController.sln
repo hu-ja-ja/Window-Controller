@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowController.Browser", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowController.App", "WindowController.App\WindowController.App.csproj", "{B748E06C-334C-4575-9B50-7F037BE0729C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowController.Core.Tests", "WindowController.Core.Tests\WindowController.Core.Tests.csproj", "{89485D59-7247-423B-8360-37C26780B5DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{B748E06C-334C-4575-9B50-7F037BE0729C}.Release|x64.Build.0 = Release|Any CPU
 		{B748E06C-334C-4575-9B50-7F037BE0729C}.Release|x86.ActiveCfg = Release|Any CPU
 		{B748E06C-334C-4575-9B50-7F037BE0729C}.Release|x86.Build.0 = Release|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Debug|x64.Build.0 = Debug|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Debug|x86.Build.0 = Debug|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Release|x64.ActiveCfg = Release|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Release|x64.Build.0 = Release|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Release|x86.ActiveCfg = Release|Any CPU
+		{89485D59-7247-423B-8360-37C26780B5DD}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
