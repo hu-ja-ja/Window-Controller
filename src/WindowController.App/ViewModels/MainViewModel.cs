@@ -45,6 +45,7 @@ public partial class MainViewModel : ObservableObject
     private readonly SyncManager _syncManager;
     private readonly AppSettingsStore _appSettings;
     private readonly ILogger _log;
+    private bool _isUpdatingProfileName;
 
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _profileName = "";
@@ -447,13 +448,36 @@ public partial class MainViewModel : ObservableObject
 
     private void OnProfileNameChanged(ProfileItem pi)
     {
+        // Prevent re-entrancy when we programmatically update pi.Name
+        if (_isUpdatingProfileName)
+            return;
+
+        // Get the current profile from the store
+        var current = _store.FindById(pi.Id);
+        if (current == null)
+        {
+            StatusText = "プロファイルが見つかりません。";
+            return;
+        }
+
+        // If the name has not actually changed compared to the store, ignore.
+        if (string.Equals(current.Name, pi.Name, StringComparison.Ordinal))
+            return;
+
+
         var newName = pi.Name?.Trim();
         if (string.IsNullOrEmpty(newName))
         {
             // Revert to current stored name
-            var current = _store.FindById(pi.Id);
-            if (current != null)
+            _isUpdatingProfileName = true;
+            try
+            {
                 pi.Name = current.Name;
+            }
+            finally
+            {
+                _isUpdatingProfileName = false;
+            }
             StatusText = "プロファイル名を空にすることはできません。";
             return;
         }
@@ -467,7 +491,17 @@ public partial class MainViewModel : ObservableObject
 
         // If the name was adjusted due to conflict, update the UI
         if (finalName != newName)
-            pi.Name = finalName;
+        {
+            _isUpdatingProfileName = true;
+            try
+            {
+                pi.Name = finalName;
+            }
+            finally
+            {
+                _isUpdatingProfileName = false;
+            }
+        }
 
         _syncManager.ScheduleRebuild();
         StatusText = $"名前を変更しました: {finalName}";

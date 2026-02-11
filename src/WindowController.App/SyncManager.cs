@@ -118,6 +118,7 @@ public class SyncManager : IDisposable
         {
             _hookManager.Uninstall();
             _syncGroups.Clear();
+            _profileNames.Clear();
             _lastMinMaxByHwnd.Clear();
         }
     }

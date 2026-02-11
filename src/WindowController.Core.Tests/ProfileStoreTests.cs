@@ -17,7 +17,14 @@ public class ProfileStoreTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_tempDir, true); } catch { }
+        try
+        {
+            Directory.Delete(_tempDir, true);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to delete temporary test directory {TempDir}", _tempDir);
+        }
     }
 
     private string TempFile() => Path.Combine(_tempDir, "profiles.json");
