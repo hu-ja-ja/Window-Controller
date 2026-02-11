@@ -15,8 +15,10 @@ public class SyncManager : IDisposable
     private readonly WinEventHookManager _hookManager;
     private readonly ILogger _log;
 
-    // profileName -> set of hwnds
+    // profileId -> set of hwnds
     private Dictionary<string, HashSet<nint>> _syncGroups = new();
+    // profileId -> display name (for logging)
+    private Dictionary<string, string> _profileNames = new();
     private Dictionary<nint, int> _lastMinMaxByHwnd = new();
     private Dictionary<string, nint> _lastForegroundByProfile = new();
     private Dictionary<string, long> _lastForegroundTickByProfile = new();
@@ -52,6 +54,8 @@ public class SyncManager : IDisposable
         var candidates = GetCandidatesLightweight();
         var newGroups = new Dictionary<string, HashSet<nint>>();
 
+        var newNames = new Dictionary<string, string>();
+
         foreach (var profile in _store.Data.Profiles)
         {
             if (profile.SyncMinMax == 0) continue;
@@ -64,10 +68,14 @@ public class SyncManager : IDisposable
                     group.Add(match.Hwnd);
             }
             if (group.Count > 0)
-                newGroups[profile.Name] = group;
+            {
+                newGroups[profile.Id] = group;
+                newNames[profile.Id] = profile.Name;
+            }
         }
 
         _syncGroups = newGroups;
+        _profileNames = newNames;
         _lastRebuildTick = Environment.TickCount64;
     }
 
@@ -110,6 +118,7 @@ public class SyncManager : IDisposable
         {
             _hookManager.Uninstall();
             _syncGroups.Clear();
+            _profileNames.Clear();
             _lastMinMaxByHwnd.Clear();
         }
     }
@@ -158,8 +167,8 @@ public class SyncManager : IDisposable
             _isPropagating = true;
             try
             {
-                foreach (var (name, group) in groups)
-                    PropagateMinMax(name, group, hwnd, mm);
+                foreach (var (id, group) in groups)
+                    PropagateMinMax(id, group, hwnd, mm);
             }
             finally
             {
@@ -191,8 +200,8 @@ public class SyncManager : IDisposable
             _isPropagating = true;
             try
             {
-                foreach (var (name, group) in groups)
-                    PropagateForeground(name, group, hwnd);
+                foreach (var (id, group) in groups)
+                    PropagateForeground(id, group, hwnd);
             }
             finally
             {
@@ -206,7 +215,7 @@ public class SyncManager : IDisposable
         }
     }
 
-    private void PropagateMinMax(string profileName, HashSet<nint> group, nint sourceHwnd, int mm)
+    private void PropagateMinMax(string profileId, HashSet<nint> group, nint sourceHwnd, int mm)
     {
         int count = 0;
         foreach (var target in group)
@@ -236,20 +245,23 @@ public class SyncManager : IDisposable
             catch (Exception ex) { _log.Debug(ex, "PropagateMinMax failed for target {Target}", target); }
         }
         if (count > 0)
-            _log.Information("Sync propagated within profile '{Name}' to {Count} window(s)", profileName, count);
+        {
+            var name = _profileNames.GetValueOrDefault(profileId, profileId);
+            _log.Information("Sync propagated within profile '{Name}' to {Count} window(s)", name, count);
+        }
     }
 
-    private void PropagateForeground(string profileName, HashSet<nint> group, nint sourceHwnd)
+    private void PropagateForeground(string profileId, HashSet<nint> group, nint sourceHwnd)
     {
         var now = Environment.TickCount64;
-        if (_lastForegroundTickByProfile.TryGetValue(profileName, out var lastTick) &&
+        if (_lastForegroundTickByProfile.TryGetValue(profileId, out var lastTick) &&
             now - lastTick < 250 &&
-            _lastForegroundByProfile.TryGetValue(profileName, out var lastHwnd) &&
+            _lastForegroundByProfile.TryGetValue(profileId, out var lastHwnd) &&
             lastHwnd == sourceHwnd)
             return;
 
-        _lastForegroundTickByProfile[profileName] = now;
-        _lastForegroundByProfile[profileName] = sourceHwnd;
+        _lastForegroundTickByProfile[profileId] = now;
+        _lastForegroundByProfile[profileId] = sourceHwnd;
 
         int count = 0;
         foreach (var target in group)
@@ -267,16 +279,19 @@ public class SyncManager : IDisposable
             catch (Exception ex) { _log.Debug(ex, "PropagateForeground failed for target {Target}", target); }
         }
         if (count > 0)
-            _log.Information("Foreground sync within profile '{Name}' to {Count} window(s)", profileName, count);
+        {
+            var name = _profileNames.GetValueOrDefault(profileId, profileId);
+            _log.Information("Foreground sync within profile '{Name}' to {Count} window(s)", name, count);
+        }
     }
 
-    private List<(string Name, HashSet<nint> Group)> GetGroupsContainingHwnd(nint hwnd)
+    private List<(string Id, HashSet<nint> Group)> GetGroupsContainingHwnd(nint hwnd)
     {
         var result = new List<(string, HashSet<nint>)>();
-        foreach (var (name, group) in _syncGroups)
+        foreach (var (id, group) in _syncGroups)
         {
             if (group.Contains(hwnd))
-                result.Add((name, group));
+                result.Add((id, group));
         }
         return result;
     }

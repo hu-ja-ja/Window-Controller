@@ -4,6 +4,9 @@ namespace WindowController.Core.Models;
 
 public class Profile
 {
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = "";
 

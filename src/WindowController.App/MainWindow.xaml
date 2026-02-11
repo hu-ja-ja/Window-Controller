@@ -179,7 +179,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Profile" Binding="{Binding Name}" Width="*" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="Profile" Binding="{Binding Name, UpdateSourceTrigger=LostFocus}" Width="*"/>
                                 <DataGridTextColumn Header="Windows" Binding="{Binding WindowCount}" Width="80" IsReadOnly="True"/>
                             </DataGrid.Columns>
                         </DataGrid>
