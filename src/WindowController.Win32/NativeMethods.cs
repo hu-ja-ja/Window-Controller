@@ -131,6 +131,12 @@ public static class NativeMethods
     public const uint MOD_NOREPEAT = 0x4000;
     public const uint VK_W = 0x57;
 
+    // DWM — cloaked detection (virtual desktop / store apps)
+    public const int DWMWA_CLOAKED = 14;
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(nint hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {

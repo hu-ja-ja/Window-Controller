@@ -11,7 +11,7 @@ namespace WindowController.App;
 /// <summary>
 /// Result of a profile apply operation.
 /// </summary>
-public record ApplyResult(int Applied, int Total, List<string> Failures)
+public record ApplyResult(int Applied, int Total, List<string> Failures, List<string> Warnings)
 {
     public bool Success => Failures.Count == 0;
 
@@ -20,6 +20,8 @@ public record ApplyResult(int Applied, int Total, List<string> Failures)
         var msg = $"{profileName} を適用: {Applied}/{Total}";
         if (Failures.Count > 0)
             msg += $"（失敗 {Failures.Count}件: {string.Join(", ", Failures.Take(3))}）";
+        if (Warnings.Count > 0)
+            msg += $"（警告 {Warnings.Count}件）";
         return msg;
     }
 }
@@ -33,54 +35,55 @@ public class ProfileApplier
     private readonly WindowEnumerator _enumerator;
     private readonly WindowArranger _arranger;
     private readonly SyncManager _syncManager;
+    private readonly VirtualDesktopService _vdService;
     private readonly ILogger _log;
 
     public ProfileApplier(ProfileStore store, WindowEnumerator enumerator,
-        WindowArranger arranger, SyncManager syncManager, ILogger log)
+        WindowArranger arranger, SyncManager syncManager,
+        VirtualDesktopService vdService, ILogger log)
     {
         _store = store;
         _enumerator = enumerator;
         _arranger = arranger;
         _syncManager = syncManager;
+        _vdService = vdService;
         _log = log;
     }
 
     /// <summary>
     /// Apply a profile by Id.
     /// </summary>
-    /// <param name="profileId">The profile Id to apply.</param>
-    /// <param name="launchMissing">If true, launch missing windows before applying.</param>
-    /// <returns>Result with applied count and failures.</returns>
-    public async Task<ApplyResult> ApplyByIdAsync(string profileId, bool launchMissing)
+    public async Task<ApplyResult> ApplyByIdAsync(string profileId, bool launchMissing,
+        nint appHwnd = 0, MonitorData? targetMonitor = null, Guid? targetDesktopId = null)
     {
         var profile = _store.FindById(profileId);
         if (profile == null)
-        {
-            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" });
-        }
+            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" }, new());
 
-        return await ApplyProfileAsync(profile, launchMissing);
+        return await ApplyProfileAsync(profile, launchMissing, appHwnd, targetMonitor, targetDesktopId);
     }
 
     /// <summary>
     /// Apply a profile by name.
     /// </summary>
-    public async Task<ApplyResult> ApplyByNameAsync(string profileName, bool launchMissing)
+    public async Task<ApplyResult> ApplyByNameAsync(string profileName, bool launchMissing,
+        nint appHwnd = 0, MonitorData? targetMonitor = null, Guid? targetDesktopId = null)
     {
         var profile = _store.FindByName(profileName);
         if (profile == null)
-        {
-            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" });
-        }
+            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" }, new());
 
-        return await ApplyProfileAsync(profile, launchMissing);
+        return await ApplyProfileAsync(profile, launchMissing, appHwnd, targetMonitor, targetDesktopId);
     }
 
-    private async Task<ApplyResult> ApplyProfileAsync(Profile profile, bool launchMissing)
+    private async Task<ApplyResult> ApplyProfileAsync(Profile profile, bool launchMissing,
+        nint appHwnd, MonitorData? targetMonitor = null, Guid? targetDesktopId = null)
     {
+        var settings = _store.Data.Settings;
         var candidates = GetCandidates();
         int applied = 0;
         var failures = new List<string>();
+        var warnings = new List<string>();
 
         foreach (var entry in profile.Windows)
         {
@@ -100,7 +103,32 @@ public class ProfileApplier
                     continue;
                 }
 
-                _arranger.Arrange(hwnd, entry);
+                // --- Virtual Desktop handling (整備中のため無効化) ---
+                // クロスデスクトップ適用を許可しない場合は、別デスクトップ上のウィンドウをスキップする。
+                // ※デスクトップ移動/切り替えは実行しない。
+                var onCurrent = _vdService.IsWindowOnCurrentDesktop(hwnd);
+                if (onCurrent == false && !settings.AllowCrossDesktopApply)
+                {
+                    warnings.Add($"{entry.Match.Exe} | {entry.Match.Title} : 別デスクトップ — スキップ");
+                    continue;
+                }
+
+                // --- Arrange (with monitor transform warnings) ---
+                var result = _arranger.Arrange(hwnd, entry, targetMonitor);
+                if (!result.Applied)
+                {
+                    var reason = result.MonitorTransform?.Reasons.FirstOrDefault()?.Message ?? "配置失敗";
+                    failures.Add($"{entry.Match.Exe} | {entry.Match.Title} : {reason}");
+                    continue;
+                }
+
+                // Collect monitor warnings
+                if (result.MonitorTransform is { Level: MonitorTransformLevel.Warn } mt)
+                {
+                    foreach (var r in mt.Reasons)
+                        warnings.Add($"{entry.Match.Exe} : {r.Message}");
+                }
+
                 applied++;
             }
             catch (Exception ex)
@@ -111,7 +139,7 @@ public class ProfileApplier
         }
 
         _syncManager.ScheduleRebuild();
-        return new ApplyResult(applied, profile.Windows.Count, failures);
+        return new ApplyResult(applied, profile.Windows.Count, failures, warnings);
     }
 
     private async Task<nint> LaunchAndWaitAsync(WindowEntry entry, List<WindowCandidate> existingCandidates)

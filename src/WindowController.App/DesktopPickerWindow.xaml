@@ -1,0 +1,68 @@
+<ui:FluentWindow x:Class="WindowController.App.DesktopPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="仮想デスクトップを選択"
+        Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="仮想デスクトップを選択"
+                     ShowMaximize="False" ShowMinimize="False"/>
+
+        <StackPanel Grid.Row="1" Margin="24,0,24,24">
+            <TextBlock Text="配置先のデスクトップを選択してください"
+                       Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+            <TextBlock x:Name="MonitorInfoText"
+                       Style="{StaticResource SectionDescription}"/>
+
+            <Border Style="{StaticResource SectionCard}">
+                <ItemsControl x:Name="DesktopList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ui:Button Click="DesktopButton_Click"
+                                       Margin="0,3" Padding="16,12"
+                                       HorizontalContentAlignment="Left"
+                                       HorizontalAlignment="Stretch"
+                                       Appearance="Secondary">
+                                <ui:Button.Content>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding NumberLabel}" FontSize="14"
+                                                   FontWeight="SemiBold" Margin="0,0,12,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding DisplayName}" FontSize="14"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding CurrentBadge}" FontSize="11"
+                                                   Foreground="{DynamicResource SystemAccentColorPrimaryBrush}"
+                                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                </ui:Button.Content>
+                            </ui:Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <ui:Button Click="Cancel_Click"
+                       Margin="0,12,0,0" Padding="16,8"
+                       HorizontalAlignment="Right"
+                       Appearance="Secondary">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="Dismiss24"/>
+                </ui:Button.Icon>
+                <ui:Button.Content>
+                    <TextBlock Text="キャンセル"/>
+                </ui:Button.Content>
+            </ui:Button>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>
