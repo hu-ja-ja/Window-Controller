@@ -14,8 +14,7 @@ public class ProfileStore
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNamingPolicy = null, // respect JsonPropertyName attributes
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        PropertyNamingPolicy = null // respect JsonPropertyName attributes
     };
 
     private string _filePath;
@@ -62,12 +61,12 @@ public class ProfileStore
         {
             var json = File.ReadAllText(_filePath);
             var parsed = JsonSerializer.Deserialize<ProfilesRoot>(json, JsonOptions);
-            
+
             // Detect migration need before normalization
-            bool needsMigration = parsed != null && parsed.Profiles.Any(p => 
-                string.IsNullOrEmpty(p.Id) || 
+            bool needsMigration = parsed != null && parsed.Profiles.Any(p =>
+                string.IsNullOrEmpty(p.Id) ||
                 parsed.Profiles.Count(x => x.Id == p.Id) > 1);
-            
+
             var normalized = NormalizeData(parsed ?? new ProfilesRoot());
             Data = normalized;
 
@@ -156,11 +155,11 @@ public class ProfileStore
 
         var trimmed = desiredName.Trim();
         var finalName = ResolveUniqueName(trimmed, profileId);
-        
+
         // Skip save if the name hasn't actually changed
         if (finalName == profile.Name)
             return finalName;
-        
+
         profile.Name = finalName;
         profile.UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss");
         Save();

@@ -191,11 +191,13 @@ public class WindowArranger
 
     private void ApplyRect(nint hwnd, int x, int y, int w, int h, int targetState)
     {
+        const int RestoreSettleMs = 30;
+
         try
         {
             // Restore first to allow positioning
             NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
-            Thread.Sleep(30);
+            Thread.Sleep(RestoreSettleMs);
 
             // Set position and size
             NativeMethods.SetWindowPos(hwnd, 0, x, y, w, h, NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
@@ -222,11 +224,11 @@ public class WindowArranger
 
     private static void Clamp(ref int x, ref int y, ref int w, ref int h, WorkArea wa)
     {
-        const int MinVisible = 100;
+        const int MinVisibleSize = 100;
 
         // Ensure minimum size
-        if (w < MinVisible) w = MinVisible;
-        if (h < MinVisible) h = MinVisible;
+        if (w < MinVisibleSize) w = MinVisibleSize;
+        if (h < MinVisibleSize) h = MinVisibleSize;
 
         // Clamp size to work area + margin (DWM border can exceed work area)
         int maxW = wa.Width + 2 * DwmFrameMargin;

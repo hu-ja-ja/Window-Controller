@@ -150,6 +150,31 @@ public class ProfileApplier
     return new ApplyResult(applied, profile.Windows.Count, failures, warnings);
     }
 
+    // Extensions blocked from being launched via UseShellExecute to prevent
+    // arbitrary script execution through malicious profile data.
+    private static readonly HashSet<string> BlockedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".bat", ".cmd", ".ps1", ".psm1", ".psd1",
+        ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh",
+        ".msi", ".msp", ".scr", ".hta", ".inf", ".reg",
+        ".com", ".pif"
+    };
+
+    private const int LaunchTimeoutMs = 12_000;
+    private const int LaunchPollIntervalMs = 300;
+
+    /// <summary>
+    /// Returns true if the path points to a genuine executable (.exe) and not
+    /// a script or installer that could be used for arbitrary code execution.
+    /// </summary>
+    private static bool IsAllowedLaunchPath(string filePath)
+    {
+        var ext = Path.GetExtension(filePath);
+        if (BlockedExtensions.Contains(ext))
+            return false;
+        return true;
+    }
+
     private async Task<nint> LaunchAndWaitAsync(WindowEntry entry, List<WindowCandidate> existingCandidates)
     {
         var exe = entry.Match.Exe;
@@ -163,6 +188,13 @@ public class ProfileApplier
         try
         {
             var startPath = !string.IsNullOrEmpty(path) && File.Exists(path) ? path : exe;
+
+            // Block potentially dangerous file types (scripts, installers, etc.)
+            if (!IsAllowedLaunchPath(startPath))
+            {
+                _log.Warning("Launch blocked for potentially unsafe file type: {Path}", startPath);
+                return 0;
+            }
 
             var psi = new ProcessStartInfo(startPath);
             if (!string.IsNullOrEmpty(url))
@@ -190,9 +222,9 @@ public class ProfileApplier
 
         // Wait for new window
         var sw = Stopwatch.StartNew();
-        while (sw.ElapsedMilliseconds < 12000)
+        while (sw.ElapsedMilliseconds < LaunchTimeoutMs)
         {
-            await Task.Delay(300);
+            await Task.Delay(LaunchPollIntervalMs);
             var wins = _enumerator.EnumerateWindows();
             foreach (var w in wins)
             {

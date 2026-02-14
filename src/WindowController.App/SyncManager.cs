@@ -22,9 +22,14 @@ public class SyncManager : IDisposable
     private Dictionary<nint, int> _lastMinMaxByHwnd = new();
     private Dictionary<string, nint> _lastForegroundByProfile = new();
     private Dictionary<string, long> _lastForegroundTickByProfile = new();
-    private bool _isPropagating;
+    private volatile bool _isPropagating;
     private long _lastRebuildTick;
     private bool _disposed;
+
+    // Protects _syncGroups, _profileNames, _lastMinMaxByHwnd,
+    // _lastForegroundByProfile, _lastForegroundTickByProfile against
+    // concurrent access from WinEvent callbacks and ScheduleRebuild (Task.Run).
+    private readonly object _syncLock = new();
 
     // Debounce rebuild: avoid multiple rapid rebuilds
     private CancellationTokenSource? _rebuildCts;
@@ -35,6 +40,9 @@ public class SyncManager : IDisposable
     private uint _lastEventType;
     private long _lastEventTick;
     private const long EventThrottleMs = 30;
+
+    private const long ForegroundDebounceMs = 250;
+    private const long RebuildCooldownMs = 2000;
 
     public SyncManager(ProfileStore store, WindowEnumerator enumerator,
         WinEventHookManager hookManager, ILogger log)
@@ -74,9 +82,12 @@ public class SyncManager : IDisposable
             }
         }
 
-        _syncGroups = newGroups;
-        _profileNames = newNames;
-        _lastRebuildTick = Environment.TickCount64;
+        lock (_syncLock)
+        {
+            _syncGroups = newGroups;
+            _profileNames = newNames;
+            _lastRebuildTick = Environment.TickCount64;
+        }
     }
 
     /// <summary>
@@ -117,9 +128,12 @@ public class SyncManager : IDisposable
         else
         {
             _hookManager.Uninstall();
-            _syncGroups.Clear();
-            _profileNames.Clear();
-            _lastMinMaxByHwnd.Clear();
+            lock (_syncLock)
+            {
+                _syncGroups.Clear();
+                _profileNames.Clear();
+                _lastMinMaxByHwnd.Clear();
+            }
         }
     }
 
@@ -152,9 +166,12 @@ public class SyncManager : IDisposable
             if (!NativeMethods.IsWindow(hwnd)) return;
             var mm = WindowEnumerator.GetMinMax(hwnd);
 
-            if (_lastMinMaxByHwnd.TryGetValue(hwnd, out var prev) && prev == mm)
-                return;
-            _lastMinMaxByHwnd[hwnd] = mm;
+            lock (_syncLock)
+            {
+                if (_lastMinMaxByHwnd.TryGetValue(hwnd, out var prev) && prev == mm)
+                    return;
+                _lastMinMaxByHwnd[hwnd] = mm;
+            }
 
             var groups = GetGroupsContainingHwnd(hwnd);
             if (groups.Count == 0)
@@ -239,7 +256,7 @@ public class SyncManager : IDisposable
                 {
                     NativeMethods.ShowWindow(target, NativeMethods.SW_RESTORE);
                 }
-                _lastMinMaxByHwnd[target] = mm;
+                lock (_syncLock) { _lastMinMaxByHwnd[target] = mm; }
                 count++;
             }
             catch (Exception ex) { _log.Debug(ex, "PropagateMinMax failed for target {Target}", target); }
@@ -254,14 +271,17 @@ public class SyncManager : IDisposable
     private void PropagateForeground(string profileId, HashSet<nint> group, nint sourceHwnd)
     {
         var now = Environment.TickCount64;
-        if (_lastForegroundTickByProfile.TryGetValue(profileId, out var lastTick) &&
-            now - lastTick < 250 &&
-            _lastForegroundByProfile.TryGetValue(profileId, out var lastHwnd) &&
-            lastHwnd == sourceHwnd)
-            return;
+        lock (_syncLock)
+        {
+            if (_lastForegroundTickByProfile.TryGetValue(profileId, out var lastTick) &&
+                now - lastTick < ForegroundDebounceMs &&
+                _lastForegroundByProfile.TryGetValue(profileId, out var lastHwnd) &&
+                lastHwnd == sourceHwnd)
+                return;
 
-        _lastForegroundTickByProfile[profileId] = now;
-        _lastForegroundByProfile[profileId] = sourceHwnd;
+            _lastForegroundTickByProfile[profileId] = now;
+            _lastForegroundByProfile[profileId] = sourceHwnd;
+        }
 
         int count = 0;
         foreach (var target in group)
@@ -287,18 +307,21 @@ public class SyncManager : IDisposable
 
     private List<(string Id, HashSet<nint> Group)> GetGroupsContainingHwnd(nint hwnd)
     {
-        var result = new List<(string, HashSet<nint>)>();
-        foreach (var (id, group) in _syncGroups)
+        lock (_syncLock)
         {
-            if (group.Contains(hwnd))
-                result.Add((id, group));
+            var result = new List<(string, HashSet<nint>)>();
+            foreach (var (id, group) in _syncGroups)
+            {
+                if (group.Contains(hwnd))
+                    result.Add((id, group));
+            }
+            return result;
         }
-        return result;
     }
 
     private void TryRebuild()
     {
-        if (Environment.TickCount64 - _lastRebuildTick > 2000)
+        if (Environment.TickCount64 - _lastRebuildTick > RebuildCooldownMs)
             ScheduleRebuild(50);
     }
 
