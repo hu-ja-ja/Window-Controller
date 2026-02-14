@@ -11,7 +11,7 @@ namespace WindowController.App;
 /// <summary>
 /// Result of a profile apply operation.
 /// </summary>
-public record ApplyResult(int Applied, int Total, List<string> Failures)
+public record ApplyResult(int Applied, int Total, IReadOnlyList<string> Failures)
 {
     public bool Success => Failures.Count == 0;
 
@@ -32,17 +32,26 @@ public class ProfileApplier
     private readonly ProfileStore _store;
     private readonly WindowEnumerator _enumerator;
     private readonly WindowArranger _arranger;
-    private readonly SyncManager _syncManager;
+    private readonly Action _scheduleRebuild;
     private readonly ILogger _log;
 
-    public ProfileApplier(ProfileStore store, WindowEnumerator enumerator,
-        WindowArranger arranger, SyncManager syncManager, ILogger log)
+    private readonly Func<List<WindowCandidate>> _candidatesProvider;
+
+    public ProfileApplier(
+        ProfileStore store,
+        WindowEnumerator enumerator,
+        WindowArranger arranger,
+        Action scheduleRebuild,
+        ILogger log,
+        Func<List<WindowCandidate>>? candidatesProvider = null)
     {
         _store = store;
         _enumerator = enumerator;
         _arranger = arranger;
-        _syncManager = syncManager;
+        _scheduleRebuild = scheduleRebuild;
         _log = log;
+
+        _candidatesProvider = candidatesProvider ?? GetCandidatesFromEnumerator;
     }
 
     /// <summary>
@@ -78,7 +87,7 @@ public class ProfileApplier
 
     private async Task<ApplyResult> ApplyProfileAsync(Profile profile, bool launchMissing)
     {
-        var candidates = GetCandidates();
+        var candidates = _candidatesProvider();
         int applied = 0;
         var failures = new List<string>();
 
@@ -110,7 +119,7 @@ public class ProfileApplier
             }
         }
 
-        _syncManager.ScheduleRebuild();
+        _scheduleRebuild();
         return new ApplyResult(applied, profile.Windows.Count, failures);
     }
 
@@ -166,12 +175,12 @@ public class ProfileApplier
         }
 
         // Last resort: try matching again
-        var newCandidates = GetCandidates();
+        var newCandidates = _candidatesProvider();
         var match = WindowMatcher.FindBest(entry, newCandidates);
         return match?.Hwnd ?? 0;
     }
 
-    private List<WindowCandidate> GetCandidates()
+    private List<WindowCandidate> GetCandidatesFromEnumerator()
     {
         var wins = _enumerator.EnumerateWindows();
         return wins.Select(w => new WindowCandidate

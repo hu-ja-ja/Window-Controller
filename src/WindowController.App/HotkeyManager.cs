@@ -26,6 +26,9 @@ public class HotkeyManager : IDisposable
     private HwndSource? _hwndSource;
     private bool _disposed;
 
+    private readonly object _gate = new();
+    private int _nextTestHotkeyId = int.MaxValue;
+
     // Currently registered hotkeys
     private readonly Dictionary<int, Action> _callbacks = new();
     private readonly Dictionary<int, HotkeyBinding> _registeredBindings = new();
@@ -123,92 +126,104 @@ public class HotkeyManager : IDisposable
     /// <summary>
     /// Test if a hotkey can be registered without actually keeping it registered.
     /// Used to validate hotkey before saving to settings.
+    /// Note: This method does not reserve the hotkey. Another thread/process may register it
+    /// after this check and before the actual registration.
     /// </summary>
     public HotkeyRegistrationResult TestHotkey(HotkeyBinding binding)
     {
         if (binding.IsEmpty)
             return new HotkeyRegistrationResult(true);
 
-        if (_hwndSource == null)
-            return new HotkeyRegistrationResult(false, "HotkeyManager not initialized");
-
-        var hwnd = _hwndSource.Handle;
-        var modifiers = GetModifiers(binding);
-        var vkCode = GetVirtualKeyCode(binding.Key);
-
-        if (vkCode == 0)
-            return new HotkeyRegistrationResult(false, $"無効なキー: {binding.Key}");
-
-        // Check for conflicts with already registered hotkeys
-        foreach (var (id, existingBinding) in _registeredBindings)
+        lock (_gate)
         {
-            if (existingBinding.Equals(binding))
+            if (_hwndSource == null)
+                return new HotkeyRegistrationResult(false, "HotkeyManager not initialized");
+
+            var hwnd = _hwndSource.Handle;
+            var modifiers = GetModifiers(binding);
+            var vkCode = GetVirtualKeyCode(binding.Key);
+
+            if (vkCode == 0)
+                return new HotkeyRegistrationResult(false, $"無効なキー: {binding.Key}");
+
+            // Check for conflicts with already registered hotkeys
+            foreach (var (_, existingBinding) in _registeredBindings)
             {
-                return new HotkeyRegistrationResult(false, $"このホットキーは既に登録されています: {binding}");
+                if (existingBinding.Equals(binding))
+                {
+                    return new HotkeyRegistrationResult(false, $"このホットキーは既に登録されています: {binding}");
+                }
             }
-        }
 
-        // Try to register with a temporary ID
-        const int testId = 99999;
-        var result = NativeMethods.RegisterHotKey(hwnd, testId, modifiers | NativeMethods.MOD_NOREPEAT, (uint)vkCode);
-        if (result)
-        {
-            // Immediately unregister
-            NativeMethods.UnregisterHotKey(hwnd, testId);
-            return new HotkeyRegistrationResult(true);
-        }
-        else
-        {
-            return new HotkeyRegistrationResult(false, $"ホットキー {binding} は他のアプリで使用中か、システムで予約されています");
+            // Try to register with a temporary ID that will not collide with real hotkey IDs.
+            // Use unique IDs to avoid cross-thread interference.
+            var testId = unchecked(_nextTestHotkeyId--);
+            var result = NativeMethods.RegisterHotKey(hwnd, testId, modifiers | NativeMethods.MOD_NOREPEAT, (uint)vkCode);
+            if (result)
+            {
+                // Immediately unregister
+                NativeMethods.UnregisterHotKey(hwnd, testId);
+                return new HotkeyRegistrationResult(true);
+            }
+            else
+            {
+                return new HotkeyRegistrationResult(false, $"ホットキー {binding} は他のアプリで使用中か、システムで予約されています");
+            }
         }
     }
 
     private HotkeyRegistrationResult RegisterHotkey(int hotkeyId, HotkeyBinding binding, Action callback, string description)
     {
-        if (_hwndSource == null)
-            return new HotkeyRegistrationResult(false, "HotkeyManager not initialized");
-
-        if (binding.IsEmpty)
-            return new HotkeyRegistrationResult(true);
-
-        var hwnd = _hwndSource.Handle;
-        var modifiers = GetModifiers(binding);
-        var vkCode = GetVirtualKeyCode(binding.Key);
-
-        if (vkCode == 0)
+        lock (_gate)
         {
-            _log.Warning("Invalid key for hotkey {Description}: {Key}", description, binding.Key);
-            return new HotkeyRegistrationResult(false, $"無効なキー: {binding.Key}");
-        }
+            if (_hwndSource == null)
+                return new HotkeyRegistrationResult(false, "HotkeyManager not initialized");
 
-        var result = NativeMethods.RegisterHotKey(hwnd, hotkeyId, modifiers | NativeMethods.MOD_NOREPEAT, (uint)vkCode);
-        if (result)
-        {
-            _callbacks[hotkeyId] = callback;
-            _registeredBindings[hotkeyId] = binding.Clone();
-            _log.Information("Hotkey [{Description}] {Binding} registered", description, binding);
-            return new HotkeyRegistrationResult(true);
-        }
-        else
-        {
-            _log.Warning("Failed to register hotkey [{Description}] {Binding}", description, binding);
-            return new HotkeyRegistrationResult(false, $"ホットキー {binding} の登録に失敗しました（他のアプリで使用中の可能性）");
+            if (binding.IsEmpty)
+                return new HotkeyRegistrationResult(true);
+
+            var hwnd = _hwndSource.Handle;
+            var modifiers = GetModifiers(binding);
+            var vkCode = GetVirtualKeyCode(binding.Key);
+
+            if (vkCode == 0)
+            {
+                _log.Warning("Invalid key for hotkey {Description}: {Key}", description, binding.Key);
+                return new HotkeyRegistrationResult(false, $"無効なキー: {binding.Key}");
+            }
+
+            var result = NativeMethods.RegisterHotKey(hwnd, hotkeyId, modifiers | NativeMethods.MOD_NOREPEAT, (uint)vkCode);
+            if (result)
+            {
+                _callbacks[hotkeyId] = callback;
+                _registeredBindings[hotkeyId] = binding.Clone();
+                _log.Information("Hotkey [{Description}] {Binding} registered", description, binding);
+                return new HotkeyRegistrationResult(true);
+            }
+            else
+            {
+                _log.Warning("Failed to register hotkey [{Description}] {Binding}", description, binding);
+                return new HotkeyRegistrationResult(false, $"ホットキー {binding} の登録に失敗しました（他のアプリで使用中の可能性）");
+            }
         }
     }
 
     private void UnregisterHotkey(int hotkeyId)
     {
-        if (_hwndSource == null) return;
-
-        if (_callbacks.ContainsKey(hotkeyId))
+        lock (_gate)
         {
-            NativeMethods.UnregisterHotKey(_hwndSource.Handle, hotkeyId);
-            if (_registeredBindings.TryGetValue(hotkeyId, out var binding))
+            if (_hwndSource == null) return;
+
+            if (_callbacks.ContainsKey(hotkeyId))
             {
-                _log.Information("Hotkey {Binding} unregistered", binding);
+                NativeMethods.UnregisterHotKey(_hwndSource.Handle, hotkeyId);
+                if (_registeredBindings.TryGetValue(hotkeyId, out var binding))
+                {
+                    _log.Information("Hotkey {Binding} unregistered", binding);
+                }
+                _callbacks.Remove(hotkeyId);
+                _registeredBindings.Remove(hotkeyId);
             }
-            _callbacks.Remove(hotkeyId);
-            _registeredBindings.Remove(hotkeyId);
         }
     }
 
@@ -329,20 +344,23 @@ public class HotkeyManager : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        if (_hwndSource != null)
+        lock (_gate)
         {
-            // Unregister all hotkeys
-            foreach (var hotkeyId in _callbacks.Keys.ToList())
+            if (_hwndSource != null)
             {
-                NativeMethods.UnregisterHotKey(_hwndSource.Handle, hotkeyId);
-            }
-            _callbacks.Clear();
-            _registeredBindings.Clear();
-            _profileHotkeyIds.Clear();
+                // Unregister all hotkeys
+                foreach (var hotkeyId in _callbacks.Keys.ToList())
+                {
+                    NativeMethods.UnregisterHotKey(_hwndSource.Handle, hotkeyId);
+                }
+                _callbacks.Clear();
+                _registeredBindings.Clear();
+                _profileHotkeyIds.Clear();
 
-            _hwndSource.RemoveHook(WndProc);
-            _hwndSource.Dispose();
-            _hwndSource = null;
+                _hwndSource.RemoveHook(WndProc);
+                _hwndSource.Dispose();
+                _hwndSource = null;
+            }
         }
     }
 }

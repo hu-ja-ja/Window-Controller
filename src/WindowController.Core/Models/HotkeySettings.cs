@@ -7,12 +7,18 @@ namespace WindowController.Core.Models;
 /// </summary>
 public class HotkeyBinding
 {
+    private string _key = "";
+
     /// <summary>
     /// Key code (e.g., "W", "F1", "1", etc.).
     /// Empty string means not bound.
     /// </summary>
     [JsonPropertyName("key")]
-    public string Key { get; set; } = "";
+    public string Key
+    {
+        get => _key;
+        set => _key = value ?? "";
+    }
 
     /// <summary>
     /// Modifier flags (Ctrl, Alt, Shift, Win).
@@ -77,7 +83,7 @@ public class HotkeyBinding
 
     public override bool Equals(object? obj) => obj is HotkeyBinding other && Equals(other);
 
-    public override int GetHashCode() => HashCode.Combine(Key?.ToUpperInvariant(), Ctrl, Alt, Shift, Win);
+    public override int GetHashCode() => HashCode.Combine(Key.ToUpperInvariant(), Ctrl, Alt, Shift, Win);
 }
 
 /// <summary>

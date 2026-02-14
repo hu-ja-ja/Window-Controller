@@ -84,7 +84,7 @@ public partial class App : Application
             _syncManager = new SyncManager(_profileStore, enumerator, hookManager, _log);
 
             // Profile applier for hotkey access
-            _profileApplier = new ProfileApplier(_profileStore, enumerator, arranger, _syncManager, _log);
+            _profileApplier = new ProfileApplier(_profileStore, enumerator, arranger, () => _syncManager.ScheduleRebuild(), _log);
 
             _viewModel = new MainViewModel(_profileStore, enumerator, arranger, urlRetriever, _syncManager, _appSettingsStore, _log);
             _viewModel.Initialize();
@@ -138,12 +138,7 @@ public partial class App : Application
             _hotkeyManager,
             _syncManager,
             _log,
-            refreshHotkeysCallback: RegisterAllHotkeys,
-            applyProfileCallback: async (profileId, launchMissing) =>
-            {
-                if (_profileApplier != null)
-                    await _profileApplier.ApplyByIdAsync(profileId, launchMissing);
-            });
+            refreshHotkeysCallback: RegisterAllHotkeys);
 
         _settingsWindow = new SettingsWindow();
         _settingsWindow.DataContext = _settingsViewModel;
