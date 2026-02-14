@@ -86,7 +86,7 @@ public partial class App : Application
             _vdService = new VirtualDesktopService(_log);
 
             // Profile applier for hotkey access
-            _profileApplier = new ProfileApplier(_profileStore, enumerator, arranger, _syncManager, _vdService, _log);
+            _profileApplier = new ProfileApplier(_profileStore, enumerator, arranger, () => _syncManager.ScheduleRebuild(), _log);
 
             _viewModel = new MainViewModel(_profileStore, enumerator, arranger, urlRetriever, _syncManager, _vdService, _profileApplier, _appSettingsStore, _log);
             _viewModel.Initialize();
@@ -140,20 +140,7 @@ public partial class App : Application
             _hotkeyManager,
             _syncManager,
             _log,
-            refreshHotkeysCallback: RegisterAllHotkeys,
-            applyProfileCallback: async (profileId, launchMissing) =>
-            {
-                if (_profileApplier != null)
-                {
-                    nint appHwnd = 0;
-                    if (_mainWindow != null)
-                    {
-                        var helper = new WindowInteropHelper(_mainWindow);
-                        appHwnd = helper.Handle;
-                    }
-                    await _profileApplier.ApplyByIdAsync(profileId, launchMissing, appHwnd);
-                }
-            });
+            refreshHotkeysCallback: RegisterAllHotkeys);
 
         _settingsWindow = new SettingsWindow();
         _settingsWindow.DataContext = _settingsViewModel;
@@ -191,7 +178,7 @@ public partial class App : Application
                 {
                     if (_profileApplier != null)
                     {
-                                nint appHwnd = 0;
+                        nint appHwnd = 0;
                         if (_mainWindow != null)
                         {
                             var helper = new WindowInteropHelper(_mainWindow);
