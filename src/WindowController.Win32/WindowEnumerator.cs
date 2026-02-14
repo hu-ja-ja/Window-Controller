@@ -36,6 +36,7 @@ public class WindowEnumerator
     // WMI command-line cache: PID → (commandLine, tickWhenCached)
     private readonly ConcurrentDictionary<uint, (string CmdLine, long Tick)> _cmdLineCache = new();
     private const long CmdLineCacheTtlMs = 60_000; // 1 minute
+    private const int CmdLineCacheMaxEntries = 200;
 
     public WindowEnumerator(ILogger logger, Func<nint, string, string>? urlGetter = null)
     {
@@ -259,7 +260,7 @@ public class WindowEnumerator
         _cmdLineCache[pid] = (cmdLine, now);
 
         // Prune stale entries periodically
-        if (_cmdLineCache.Count > 200)
+        if (_cmdLineCache.Count > CmdLineCacheMaxEntries)
         {
             var staleKeys = _cmdLineCache
                 .Where(kv => now - kv.Value.Tick > CmdLineCacheTtlMs * 2)

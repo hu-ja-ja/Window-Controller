@@ -157,7 +157,10 @@ public class HotkeyManager : IDisposable
 
             // Try to register with a temporary ID that will not collide with real hotkey IDs.
             // Use unique IDs to avoid cross-thread interference.
+            // Guard against wraparound into the profile hotkey ID range.
             var testId = unchecked(_nextTestHotkeyId--);
+            if (_nextTestHotkeyId <= HOTKEY_ID_PROFILE_BASE + 100_000)
+                _nextTestHotkeyId = int.MaxValue;
             var result = NativeMethods.RegisterHotKey(hwnd, testId, modifiers | NativeMethods.MOD_NOREPEAT, (uint)vkCode);
             if (result)
             {

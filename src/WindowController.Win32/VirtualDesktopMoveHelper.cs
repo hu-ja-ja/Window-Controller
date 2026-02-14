@@ -114,6 +114,11 @@ internal static class VirtualDesktopMoveHelper
     // ── Public API ──
 
     /// <summary>
+    /// Maximum time to wait for the MTA thread to complete COM operations.
+    /// </summary>
+    private static readonly TimeSpan MtaThreadTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// Move a window to the specified virtual desktop using undocumented internal COM.
     /// Tries each known build config; returns true on the first successful move.
     /// </summary>
@@ -147,7 +152,7 @@ internal static class VirtualDesktopMoveHelper
         thread.Start();
 
         // Avoid blocking indefinitely in case the shell COM call hangs.
-        var completed = thread.Join(TimeSpan.FromSeconds(5));
+        var completed = thread.Join(MtaThreadTimeout);
         if (!completed)
         {
             log.Warning("VDMoveHelper: MTA thread did not complete within the timeout; aborting move");
@@ -255,7 +260,7 @@ internal static class VirtualDesktopMoveHelper
                 return false;
 
             log.Debug("VDMoveHelper: matched 24H2 interface");
-            return DoMove(vdm, pView, desktopId, log);
+            return DoMove(vdm.FindDesktop, vdm.MoveViewToDesktop, pView, desktopId, log);
         }
         catch (InvalidCastException)
         {
@@ -281,7 +286,7 @@ internal static class VirtualDesktopMoveHelper
                 return false;
 
             log.Debug("VDMoveHelper: matched 22H2 interface");
-            return DoMove(vdm, pView, desktopId, log);
+            return DoMove(vdm.FindDesktop, vdm.MoveViewToDesktop, pView, desktopId, log);
         }
         catch (InvalidCastException)
         {
@@ -293,50 +298,28 @@ internal static class VirtualDesktopMoveHelper
         }
     }
 
+    // Delegates matching the COM method signatures, shared between build-specific interfaces.
+    private delegate int FindDesktopFunc(ref Guid desktopId, out nint ppDesktop);
+    private delegate int MoveViewFunc(nint pView, nint pDesktop);
+
     /// <summary>
-    /// FindDesktop + MoveViewToDesktop — generic over both build interfaces.
+    /// FindDesktop + MoveViewToDesktop — generic over both build interfaces
+    /// via delegates to avoid duplicating the same logic.
     /// </summary>
-    private static bool DoMove(IVdmInternal_24H2 vdm, nint pView, Guid desktopId, ILogger log)
+    private static bool DoMove(FindDesktopFunc findDesktop, MoveViewFunc moveView,
+        nint pView, Guid desktopId, ILogger log)
     {
         nint pDesktop = 0;
         try
         {
-            int hr = vdm.FindDesktop(ref desktopId, out pDesktop);
+            int hr = findDesktop(ref desktopId, out pDesktop);
             if (hr != 0 || pDesktop == 0)
             {
                 log.Debug("VDMoveHelper: FindDesktop hr=0x{Hr:X8}", hr);
                 return false;
             }
 
-            hr = vdm.MoveViewToDesktop(pView, pDesktop);
-            if (hr != 0)
-            {
-                log.Debug("VDMoveHelper: MoveViewToDesktop hr=0x{Hr:X8}", hr);
-                return false;
-            }
-
-            log.Debug("VDMoveHelper: moved window to desktop {Desktop}", desktopId);
-            return true;
-        }
-        finally
-        {
-            if (pDesktop != 0) Marshal.Release(pDesktop);
-        }
-    }
-
-    private static bool DoMove(IVdmInternal_22H2 vdm, nint pView, Guid desktopId, ILogger log)
-    {
-        nint pDesktop = 0;
-        try
-        {
-            int hr = vdm.FindDesktop(ref desktopId, out pDesktop);
-            if (hr != 0 || pDesktop == 0)
-            {
-                log.Debug("VDMoveHelper: FindDesktop hr=0x{Hr:X8}", hr);
-                return false;
-            }
-
-            hr = vdm.MoveViewToDesktop(pView, pDesktop);
+            hr = moveView(pView, pDesktop);
             if (hr != 0)
             {
                 log.Debug("VDMoveHelper: MoveViewToDesktop hr=0x{Hr:X8}", hr);
