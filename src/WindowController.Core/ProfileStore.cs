@@ -1,5 +1,7 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Unicode;
 using WindowController.Core.Models;
 using Serilog;
 
@@ -14,7 +16,8 @@ public class ProfileStore
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNamingPolicy = null // respect JsonPropertyName attributes
+        PropertyNamingPolicy = null, // respect JsonPropertyName attributes
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
     };
 
     private string _filePath;
