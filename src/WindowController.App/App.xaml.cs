@@ -26,6 +26,7 @@ public partial class App : Application
     private ProfileApplier? _profileApplier;
     private ProfileStore? _profileStore;
     private AppSettingsStore? _appSettingsStore;
+    private VirtualDesktopService? _vdService;
     private ILogger? _log;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -79,14 +80,15 @@ public partial class App : Application
 
             var urlRetriever = new BrowserUrlRetriever(_log);
             var enumerator = new WindowEnumerator(_log, (hwnd, exe) => urlRetriever.TryGetUrl(hwnd, exe));
-            var arranger = new WindowArranger(_log);
+            var arranger = new WindowArranger(_log, _profileStore.Data.Settings);
             var hookManager = new WinEventHookManager(_log);
             _syncManager = new SyncManager(_profileStore, enumerator, hookManager, _log);
+            _vdService = new VirtualDesktopService(_log);
 
             // Profile applier for hotkey access
             _profileApplier = new ProfileApplier(_profileStore, enumerator, arranger, () => _syncManager.ScheduleRebuild(), _log);
 
-            _viewModel = new MainViewModel(_profileStore, enumerator, arranger, urlRetriever, _syncManager, _appSettingsStore, _log);
+            _viewModel = new MainViewModel(_profileStore, enumerator, arranger, urlRetriever, _syncManager, _vdService, _profileApplier, _appSettingsStore, _log);
             _viewModel.Initialize();
 
             // Start sync hooks if enabled
@@ -176,7 +178,13 @@ public partial class App : Application
                 {
                     if (_profileApplier != null)
                     {
-                        var result = await _profileApplier.ApplyByIdAsync(capturedProfileId, false);
+                        nint appHwnd = 0;
+                        if (_mainWindow != null)
+                        {
+                            var helper = new WindowInteropHelper(_mainWindow);
+                            appHwnd = helper.Handle;
+                        }
+                        var result = await _profileApplier.ApplyByIdAsync(capturedProfileId, false, appHwnd);
                         var profile = _profileStore?.FindById(capturedProfileId);
                         var name = profile?.Name ?? capturedProfileId;
                         if (_viewModel != null)
@@ -250,6 +258,7 @@ public partial class App : Application
         _log?.Information("Window-Controller exiting");
         _hotkeyManager?.Dispose();
         _syncManager?.Dispose();
+        _vdService?.Dispose();
         if (_trayIcon != null)
         {
             _trayIcon.Dispose();
@@ -263,6 +272,7 @@ public partial class App : Application
     {
         _hotkeyManager?.Dispose();
         _syncManager?.Dispose();
+        _vdService?.Dispose();
         _trayIcon?.Dispose();
         Log.CloseAndFlush();
         _singleInstanceMutex?.ReleaseMutex();

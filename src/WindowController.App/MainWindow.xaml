@@ -171,6 +171,14 @@
                                   CellStyle="{StaticResource TransparentCell}"
                                   PreviewMouseWheel="DataGrid_PreviewMouseWheel"
                                   Margin="0,0,0,10">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="モニターを選択して配置"
+                                              Command="{Binding ApplyToMonitorCommand}"/>
+                                    <MenuItem Header="仮想デスクトップを選択して配置 ※整備中"
+                                              Command="{Binding ApplyToDesktopAndMonitorCommand}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="連動" Width="60" MinWidth="60">
                                     <DataGridTemplateColumn.CellStyle>
@@ -192,6 +200,7 @@
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Profile" Binding="{Binding Name, UpdateSourceTrigger=LostFocus}" Width="*"/>
+                                <DataGridTextColumn Header="Desktop" Binding="{Binding TargetDesktopLabel}" Width="100" IsReadOnly="True"/>
                                 <DataGridTextColumn Header="Windows" Binding="{Binding WindowCount}" Width="80" IsReadOnly="True"/>
                             </DataGrid.Columns>
                         </DataGrid>
