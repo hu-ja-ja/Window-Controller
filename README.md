@@ -49,25 +49,28 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
 
 | メニュー | 動作 |
 |---|---|
-| **GUI を開く** | 設定画面を表示 |
-| **プロファイルを適用 (配置のみ)** | GUI を表示 |
+| **GUI を開く** | メイン画面を表示 |
+| **設定…** | 設定画面を表示 |
+| **プロファイルを適用(配置のみ)** | メイン画面を表示（適用は GUI でプロファイルを選択） |
 | **終了** | アプリを終了 |
 
 ### ホットキー
 
 | キー | 動作 |
 |---|---|
-| **Ctrl + Alt + W** | GUI を開く |
+| **Ctrl + Alt + W** | メイン画面を表示（既定。設定で変更/無効化可） |
+| （任意） | プロファイル適用ホットキー（プロファイルごとに設定。配置のみ適用） |
 
 ### GUI
 
 | 領域 | 説明 |
 |---|---|
-| 上段 | 起動中ウィンドウ一覧（チェックして保存対象を選択） |
-| 中段 | プロファイル名入力 → 「チェックを保存」 |
-| 下段 | 保存済みプロファイル一覧（チェック＝連動 ON/OFF、名前ダブルクリックでリネーム） |
+| 起動中ウィンドウ | チェックしたウィンドウをプロファイルに保存（Title/Exe/Class/URL/Browser Profile を表示） |
+| プロファイル保存 | プロファイル名入力 → 「プロファイル保存」 |
+| 保存済みプロファイル | チェック＝最小化/最大化を常時連動、名前編集（競合時は自動で連番付与） |
 | ボタン | 適用（配置のみ）/ 一括起動＋配置 / 削除 |
-| 設定 | 連動機能全体 ON/OFF、起動時 GUI 表示、profiles.json 保存先変更 |
+| 右クリック | 「モニターを選択して配置」（配置前に警告が出ることがあります） |
+| 設定画面 | 連動機能全体 ON/OFF、起動時 GUI 表示、profiles.json 保存先、ホットキー（GUI表示/プロファイル適用） |
 
 ## データの保存場所
 
@@ -80,6 +83,22 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
 > `profiles.json` の保存先は GUI 下部の「変更…」ボタンで任意のフォルダに変更できます。
 > 「既定に戻す」で上記デフォルトに戻ります。
 
+### appsettings.json について
+
+`appsettings.json` はアプリ全体の設定（`profiles.json` の保存先・ホットキー設定など）を保持します。
+
+```json
+{
+  "profilesPath": "C:\\Path\\To\\profiles.json",
+  "hotkeys": {
+    "showGui": { "key": "W", "ctrl": true, "alt": true, "shift": false, "win": false },
+    "profiles": {
+      "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx": { "key": "1", "ctrl": true, "alt": false, "shift": false, "win": false }
+    }
+  }
+}
+```
+
 ### profiles.json スキーマ
 
 ```json
@@ -87,7 +106,11 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
   "version": 1,
   "settings": {
     "syncMinMax": 0,
-    "showGuiOnStartup": 1
+    "showGuiOnStartup": 1,
+    "aspectRatioWarnThreshold": 0.02,
+    "warnOnResolutionMismatch": true,
+    "warnOnMonitorMismatch": true,
+    "allowCrossDesktopApply": true
   },
   "profiles": [
     {
@@ -96,21 +119,34 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
       "syncMinMax": 0,
       "createdAt": "2026-01-01T20:20:20",
       "updatedAt": "2026-01-01T20:20:20",
+      "targetDesktopId": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
       "windows": [
         {
           "match": {
             "exe": "Code - Insiders.exe",
             "class": "Chrome_WidgetWin_1",
             "title": "Window Title",
-            "url": "",
-            "urlKey": "",
-            "browser": null
+            "url": "https://example.com/",
+            "urlKey": "https://example.com/",
+            "browser": {
+              "kind": "chromium",
+              "userDataDir": "C:\\Users\\you\\AppData\\Local\\Google\\Chrome\\User Data",
+              "profileDirectory": "Default"
+            }
           },
           "path": "C:\\Users\\you\\AppData\\Local\\Programs\\...\\Code - Insiders.exe",
           "rect": { "x": 0, "y": 0, "w": 960, "h": 1040 },
+          "rectNormalized": { "xN": 0.0, "yN": 0.0, "wN": 0.5, "hN": 1.0 },
           "minMax": 0,
           "snap": { "type": "left" },
-          "monitor": { "index": 1, "name": "\\\\.\\DISPLAY1" }
+          "monitor": {
+            "index": 1,
+            "name": "\\\\.\\DISPLAY1",
+            "devicePath": "\\\\?\\DISPLAY#...",
+            "pixelWidth": 3840,
+            "pixelHeight": 2160
+          },
+          "desktopId": "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"
         }
       ]
     }
@@ -118,7 +154,11 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
 }
 ```
 
-> `id` はプロファイルの内部識別子（UUID）です。旧バージョンで作成された `profiles.json` に `id` がない場合、起動時に自動で付与されます。
+> `id` はプロファイルの内部識別子（UUID）です。旧バージョンで作成された `profiles.json` に `id` がない場合や、`id` が重複している場合は起動時に自動で再付与されます。
+
+> JSON は `null` の項目を出力しません（例: `browser` / `snap` / `monitor` / `rectNormalized` / `desktopId` / `targetDesktopId` は状況により省略されます）。また `monitor.pixelWidth` / `monitor.pixelHeight` は 0 の場合は省略されます。
+
+> `desktopId` / `targetDesktopId` / `allowCrossDesktopApply` など仮想デスクトップ関連は将来拡張向けのフィールドで、GUI 上に「※整備中」と表示される機能は現状動作しない場合があります。
 
 ## ブラウザ URL 取得
 
