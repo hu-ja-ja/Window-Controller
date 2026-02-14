@@ -23,6 +23,11 @@ public class WindowArranger
     private readonly ILogger _log;
     private readonly Settings _settings;
 
+    public WindowArranger(ILogger logger)
+        : this(logger, new Settings())
+    {
+    }
+
     public WindowArranger(ILogger logger, Settings settings)
     {
         _log = logger;
@@ -82,7 +87,7 @@ public class WindowArranger
             if (isLegacyProfile)
             {
                 var fromRect = MonitorHelper.GetMonitorForRect(
-                    entry.Rect.X, entry.Rect.Y, entry.Rect.W, entry.Rect.H);
+                    monitors, entry.Rect.X, entry.Rect.Y, entry.Rect.W, entry.Rect.H);
                 targetMon = fromRect ?? monitors.FirstOrDefault() ?? new MonitorData();
                 isExact = fromRect != null;
             }
@@ -180,7 +185,7 @@ public class WindowArranger
             if (mon.WorkArea.Width > 0) return mon.WorkArea;
         }
         var fromRect = MonitorHelper.GetMonitorForRect(
-            entry.Rect.X, entry.Rect.Y, entry.Rect.W, entry.Rect.H);
+            monitors, entry.Rect.X, entry.Rect.Y, entry.Rect.W, entry.Rect.H);
         return fromRect?.WorkArea;
     }
 

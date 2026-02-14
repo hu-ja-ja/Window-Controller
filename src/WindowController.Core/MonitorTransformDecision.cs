@@ -57,8 +57,8 @@ public static class MonitorTransformDecision
             };
         }
 
-        // If saved monitor info is missing entirely, we only know the absolute rect — warn.
-        if (saved == null || (saved.PixelWidth <= 0 && saved.PixelHeight <= 0))
+        // If saved monitor info is missing or invalid, we only know the absolute rect — warn.
+        if (saved == null || saved.PixelWidth <= 0 || saved.PixelHeight <= 0)
         {
             if (!settings.WarnOnMonitorMismatch)
                 return MonitorTransformResult.Ok();
