@@ -21,4 +21,12 @@ public class Profile
 
     [JsonPropertyName("windows")]
     public List<WindowEntry> Windows { get; set; } = new();
+
+    /// <summary>
+    /// Target virtual desktop GUID. When set, windows are moved here on apply.
+    /// Set via right-click → "このデスクトップをターゲットに設定".
+    /// </summary>
+    [JsonPropertyName("targetDesktopId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TargetDesktopId { get; set; }
 }

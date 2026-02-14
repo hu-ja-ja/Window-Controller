@@ -1,0 +1,59 @@
+<ui:FluentWindow x:Class="WindowController.App.MonitorPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="モニターを選択して配置"
+        Width="440" SizeToContent="Height"
+        WindowStartupLocation="Manual"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="モニターを選択して配置"
+                     ShowMaximize="False" ShowMinimize="False"/>
+
+        <StackPanel Grid.Row="1" Margin="24,0,24,24">
+            <TextBlock Text="配置先のモニターを選択してください"
+                       Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+            <TextBlock Text="番号キーまたはクリックで選択できます"
+                       Style="{StaticResource SectionDescription}"/>
+
+            <Border Style="{StaticResource SectionCard}">
+                <ItemsControl x:Name="MonitorList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ui:Button Click="MonitorButton_Click"
+                                       Margin="0,3" Padding="16,12"
+                                       HorizontalContentAlignment="Left"
+                                       HorizontalAlignment="Stretch"
+                                       Appearance="Secondary">
+                                <ui:Button.Content>
+                                    <TextBlock Text="{Binding Label}" FontSize="14"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <ui:Button Click="Cancel_Click"
+                       Margin="0,12,0,0" Padding="16,8"
+                       HorizontalAlignment="Right"
+                       Appearance="Secondary">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="Dismiss24"/>
+                </ui:Button.Icon>
+                <ui:Button.Content>
+                    <TextBlock Text="キャンセル"/>
+                </ui:Button.Content>
+            </ui:Button>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

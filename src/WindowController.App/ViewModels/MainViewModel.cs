@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Interop;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -32,6 +33,7 @@ public partial class ProfileItem : ObservableObject
 {
     [ObservableProperty] private bool _syncMinMax;
     [ObservableProperty] private string _name = "";
+    [ObservableProperty] private string _targetDesktopLabel = "";
     public string Id { get; init; } = "";
     public int WindowCount { get; init; }
 }
@@ -43,6 +45,8 @@ public partial class MainViewModel : ObservableObject
     private readonly WindowArranger _arranger;
     private readonly BrowserUrlRetriever _urlRetriever;
     private readonly SyncManager _syncManager;
+    private readonly VirtualDesktopService _vdService;
+    private readonly ProfileApplier _profileApplier;
     private readonly ILogger _log;
     private bool _isUpdatingProfileName;
 
@@ -55,13 +59,17 @@ public partial class MainViewModel : ObservableObject
 
     public MainViewModel(ProfileStore store, WindowEnumerator enumerator,
         WindowArranger arranger, BrowserUrlRetriever urlRetriever,
-        SyncManager syncManager, AppSettingsStore appSettings, ILogger log)
+        SyncManager syncManager, VirtualDesktopService vdService,
+        ProfileApplier profileApplier,
+        AppSettingsStore appSettings, ILogger log)
     {
         _store = store;
         _enumerator = enumerator;
         _arranger = arranger;
         _urlRetriever = urlRetriever;
         _syncManager = syncManager;
+        _vdService = vdService;
+        _profileApplier = profileApplier;
         _log = log;
     }
 
@@ -184,21 +192,41 @@ public partial class MainViewModel : ObservableObject
             var rect = WindowEnumerator.GetWindowRect(w.Hwnd);
             var minMax = WindowEnumerator.GetMinMax(w.Hwnd);
 
+            // --- Always resolve owning monitor ---
             Snap? snap = null;
             Core.Models.MonitorInfo? monitor = null;
-            if (minMax == 0)
+            NormalizedRect? rectNormalized = null;
+
+            var mon = MonitorHelper.GetMonitorForRect(rect.X, rect.Y, rect.W, rect.H);
+            if (mon != null)
             {
-                var mon = MonitorHelper.GetMonitorForRect(rect.X, rect.Y, rect.W, rect.H);
-                if (mon != null)
+                monitor = new Core.Models.MonitorInfo
                 {
-                    var snapType = SnapCalculator.DetectSnap(rect.X, rect.Y, rect.W, rect.H, mon.WorkArea);
+                    Index = mon.Index,
+                    Name = mon.DeviceName,
+                    PixelWidth = mon.PixelWidth,
+                    PixelHeight = mon.PixelHeight
+                };
+
+                // Normalized rect (work-area relative)
+                rectNormalized = NormalizedRect.FromAbsolute(
+                    rect.X, rect.Y, rect.W, rect.H, mon.WorkArea);
+
+                // Snap detection (normal state only)
+                if (minMax == 0)
+                {
+                    var snapType = SnapCalculator.DetectSnap(
+                        rect.X, rect.Y, rect.W, rect.H, mon.WorkArea);
                     if (!string.IsNullOrEmpty(snapType))
-                    {
                         snap = new Snap { Type = snapType };
-                        monitor = new Core.Models.MonitorInfo { Index = mon.Index, Name = mon.DeviceName };
-                    }
                 }
             }
+
+            // --- Virtual Desktop Id ---
+            string? desktopId = null;
+            var dId = _vdService.GetWindowDesktopId(w.Hwnd);
+            if (dId.HasValue && dId.Value != Guid.Empty)
+                desktopId = dId.Value.ToString("D");
 
             return new WindowEntry
             {
@@ -213,9 +241,11 @@ public partial class MainViewModel : ObservableObject
                 },
                 Path = w.Path,
                 Rect = rect,
+                RectNormalized = rectNormalized,
                 MinMax = minMax,
                 Snap = snap,
-                Monitor = monitor
+                Monitor = monitor,
+                DesktopId = desktopId
             };
         }
         catch (Exception ex)
@@ -254,49 +284,14 @@ public partial class MainViewModel : ObservableObject
             var profile = _store.FindById(profileId);
             if (profile == null)
             {
-                StatusText = $"プロファイルが見つかりません";
+                StatusText = "プロファイルが見つかりません";
                 return;
             }
 
-            var profileName = profile.Name;
+            var appHwnd = GetMainWindowHandle();
 
-            var candidates = GetCandidates();
-            int applied = 0;
-            var failures = new List<string>();
-
-            foreach (var entry in profile.Windows)
-            {
-                try
-                {
-                    var match = WindowMatcher.FindBest(entry, candidates);
-                    nint hwnd = match?.Hwnd ?? 0;
-
-                    if ((hwnd == 0 || !NativeMethods.IsWindow(hwnd)) && launchMissing)
-                    {
-                        hwnd = await LaunchAndWaitAsync(entry, candidates);
-                    }
-
-                    if (hwnd == 0 || !NativeMethods.IsWindow(hwnd))
-                    {
-                        failures.Add($"{entry.Match.Exe} | {entry.Match.Title} : 見つかりません");
-                        continue;
-                    }
-
-                    _arranger.Arrange(hwnd, entry);
-                    applied++;
-                }
-                catch (Exception ex)
-                {
-                    failures.Add($"{entry.Match.Exe} | {entry.Match.Title} : {ex.Message}");
-                    _log.Warning(ex, "ApplyProfile item failed");
-                }
-            }
-
-            var msg = $"{profileName} を適用: {applied}/{profile.Windows.Count}";
-            if (failures.Count > 0)
-                msg += $"（失敗 {failures.Count}件: {string.Join(", ", failures.Take(3))}）";
-            StatusText = msg;
-            _syncManager.ScheduleRebuild();
+            var result = await _profileApplier.ApplyByIdAsync(profileId, launchMissing, appHwnd);
+            StatusText = result.ToStatusMessage(profile.Name);
         }
         catch (Exception ex)
         {
@@ -305,76 +300,127 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private async Task<nint> LaunchAndWaitAsync(WindowEntry entry, List<WindowCandidate> existingCandidates)
+    [RelayCommand]
+    private async Task ApplyToMonitor()
     {
-        var exe = entry.Match.Exe;
-        var url = entry.Match.Url;
-        var path = entry.Path;
+        if (SelectedProfile == null)
+        {
+            StatusText = "プロファイルを選択してください。";
+            return;
+        }
 
-        // Collect existing hwnds for this exe
-        var beforeHwnds = new HashSet<nint>(
-            existingCandidates.Where(c => c.Exe.Equals(exe, StringComparison.OrdinalIgnoreCase)).Select(c => c.Hwnd));
+        var monitors = MonitorHelper.GetMonitors();
+        if (monitors.Count == 0)
+        {
+            StatusText = "モニターが見つかりません。";
+            return;
+        }
+
+        var overlays = new List<MonitorOverlayWindow>();
+        MonitorData? selectedMonitor = null;
 
         try
         {
-            var startPath = !string.IsNullOrEmpty(path) && File.Exists(path) ? path : exe;
-
-            var psi = new ProcessStartInfo(startPath);
-            if (!string.IsNullOrEmpty(url))
+            for (int i = 0; i < monitors.Count; i++)
             {
-                // Only allow http/https/file URLs as arguments
-                if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                    url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                    url.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
-                {
-                    psi.Arguments = $"\"{url}\"";
-                }
-                else
-                {
-                    _log.Warning("Launch skipped URL argument with unsupported scheme: {Url}", url);
-                }
+                var m = monitors[i];
+                var name = m.DeviceName;
+                if (name.StartsWith("\\\\.\\"))
+                    name = name.Substring(4);
+                var overlay = new MonitorOverlayWindow(
+                    i + 1, $"{name}\n{m.PixelWidth}\u00d7{m.PixelHeight}",
+                    m.MonitorRect.Left, m.MonitorRect.Top,
+                    m.MonitorRect.Width, m.MonitorRect.Height);
+                overlay.Show();
+                overlays.Add(overlay);
             }
-            psi.UseShellExecute = true;
-            Process.Start(psi);
+
+            var picker = new MonitorPickerWindow(monitors);
+            if (Application.Current.MainWindow is { } owner)
+                picker.Owner = owner;
+            if (picker.ShowDialog() == true)
+                selectedMonitor = picker.SelectedMonitor;
+        }
+        finally
+        {
+            foreach (var o in overlays)
+                o.Close();
+        }
+
+        if (selectedMonitor == null) return;
+
+        // --- 事前警告チェック ---
+        var profile = _store.FindById(SelectedProfile.Id);
+        if (profile == null)
+        {
+            StatusText = "プロファイルが見つかりません";
+            return;
+        }
+
+        var settings = _store.Data.Settings;
+        var preWarnings = new List<string>();
+        foreach (var entry in profile.Windows)
+        {
+            bool isExact = entry.Monitor != null
+                && !string.IsNullOrEmpty(entry.Monitor.Name)
+                && entry.Monitor.Name == selectedMonitor.DeviceName;
+
+            var result = MonitorTransformDecision.Evaluate(
+                entry.Monitor,
+                selectedMonitor.PixelWidth,
+                selectedMonitor.PixelHeight,
+                isExact,
+                settings);
+
+            if (result.Level >= MonitorTransformLevel.Warn)
+            {
+                var exeName = entry.Match?.Exe ?? "不明";
+                foreach (var r in result.Reasons)
+                    preWarnings.Add($"{exeName}: {r.Message}");
+            }
+        }
+
+        // 重複排除 (同一解像度警告など)
+        preWarnings = preWarnings.Distinct().ToList();
+
+        if (preWarnings.Count > 0)
+        {
+            var monName = selectedMonitor.DeviceName;
+            if (monName.StartsWith("\\\\.\\"))
+                monName = monName.Substring(4);
+            var desc = $"配置先: {monName} ({selectedMonitor.PixelWidth}\u00d7{selectedMonitor.PixelHeight})";
+
+            var dlg = new MonitorWarningDialog(desc, preWarnings);
+            if (Application.Current.MainWindow is { } warnOwner)
+                dlg.Owner = warnOwner;
+            if (dlg.ShowDialog() != true)
+            {
+                StatusText = "配置をキャンセルしました。";
+                return;
+            }
+        }
+
+        // --- 適用 ---
+        try
+        {
+            var appHwnd = GetMainWindowHandle();
+
+            var result = await _profileApplier.ApplyByIdAsync(
+                SelectedProfile.Id, false, appHwnd, selectedMonitor);
+            StatusText = result.ToStatusMessage(profile.Name);
         }
         catch (Exception ex)
         {
-            _log.Warning(ex, "Launch failed for {Exe}", exe);
-            return 0;
+            _log.Error(ex, "ApplyToMonitor failed");
+            StatusText = $"適用に失敗: {ex.Message}";
         }
-
-        // Wait for new window
-        var sw = Stopwatch.StartNew();
-        while (sw.ElapsedMilliseconds < 12000)
-        {
-            await Task.Delay(300);
-            var wins = _enumerator.EnumerateWindows();
-            foreach (var w in wins)
-            {
-                if (w.Exe.Equals(exe, StringComparison.OrdinalIgnoreCase) && !beforeHwnds.Contains(w.Hwnd))
-                    return w.Hwnd;
-            }
-        }
-
-        // Last resort: try matching again
-        var newCandidates = GetCandidates();
-        var match = WindowMatcher.FindBest(entry, newCandidates);
-        return match?.Hwnd ?? 0;
     }
 
-    private List<WindowCandidate> GetCandidates()
+    [RelayCommand]
+    private Task ApplyToDesktopAndMonitor()
     {
-        var wins = _enumerator.EnumerateWindows();
-        return wins.Select(w => new WindowCandidate
-        {
-            Hwnd = w.Hwnd,
-            Exe = w.Exe,
-            Class = w.Class,
-            Title = w.Title,
-            Path = w.Path,
-            Url = w.Url,
-            CommandLine = w.CommandLine
-        }).ToList();
+        // 仮想デスクトップ関連は整備中のため、現時点では何もしない。
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -413,6 +459,65 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    private void SetTargetDesktop()
+    {
+        if (SelectedProfile == null)
+        {
+            StatusText = "プロファイルを選択してください。";
+            return;
+        }
+
+        var appHwnd = GetMainWindowHandle();
+
+        var desktopId = _vdService.GetCurrentDesktopId(appHwnd);
+        if (!desktopId.HasValue || desktopId.Value == Guid.Empty)
+        {
+            StatusText = "現在のデスクトップIDを取得できませんでした。";
+            return;
+        }
+
+        var profile = _store.FindById(SelectedProfile.Id);
+        if (profile == null) return;
+
+        profile.TargetDesktopId = desktopId.Value.ToString("D");
+        _store.SaveProfile(profile);
+
+        SelectedProfile.TargetDesktopLabel = FormatDesktopLabel(profile.TargetDesktopId);
+        StatusText = $"ターゲットデスクトップを設定しました: {profile.Name}";
+    }
+
+    [RelayCommand]
+    private void ClearTargetDesktop()
+    {
+        if (SelectedProfile == null)
+        {
+            StatusText = "プロファイルを選択してください。";
+            return;
+        }
+
+        var profile = _store.FindById(SelectedProfile.Id);
+        if (profile == null) return;
+
+        profile.TargetDesktopId = null;
+        _store.SaveProfile(profile);
+
+        SelectedProfile.TargetDesktopLabel = "";
+        StatusText = $"ターゲットデスクトップを解除しました: {profile.Name}";
+    }
+
+    private static string FormatDesktopLabel(string? desktopId)
+        => desktopId ?? "";
+
+    private static nint GetMainWindowHandle()
+    {
+        if (Application.Current.MainWindow is not { } mainWindow)
+            return 0;
+
+        var helper = new WindowInteropHelper(mainWindow);
+        return helper.Handle;
+    }
+
     public void ReloadProfiles()
     {
         Profiles.Clear();
@@ -423,7 +528,8 @@ public partial class MainViewModel : ObservableObject
                 Id = p.Id,
                 Name = p.Name,
                 SyncMinMax = p.SyncMinMax != 0,
-                WindowCount = p.Windows.Count
+                WindowCount = p.Windows.Count,
+                TargetDesktopLabel = FormatDesktopLabel(p.TargetDesktopId)
             };
             item.PropertyChanged += (s, e) =>
             {
