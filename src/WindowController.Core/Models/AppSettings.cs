@@ -16,4 +16,10 @@ public class AppSettings
     /// </summary>
     [JsonPropertyName("profilesPath")]
     public string ProfilesPath { get; set; } = "";
+
+    /// <summary>
+    /// Hotkey configurations (GUI toggle + per-profile apply).
+    /// </summary>
+    [JsonPropertyName("hotkeys")]
+    public HotkeySettings Hotkeys { get; set; } = new();
 }

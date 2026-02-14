@@ -43,16 +43,12 @@ public partial class MainViewModel : ObservableObject
     private readonly WindowArranger _arranger;
     private readonly BrowserUrlRetriever _urlRetriever;
     private readonly SyncManager _syncManager;
-    private readonly AppSettingsStore _appSettings;
     private readonly ILogger _log;
     private bool _isUpdatingProfileName;
 
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _profileName = "";
-    [ObservableProperty] private bool _syncEnabled;
-    [ObservableProperty] private bool _showGuiOnStartup;
     [ObservableProperty] private ProfileItem? _selectedProfile;
-    [ObservableProperty] private string _profilesPathDisplay = "";
 
     public ObservableCollection<WindowItem> Windows { get; } = new();
     public ObservableCollection<ProfileItem> Profiles { get; } = new();
@@ -66,12 +62,7 @@ public partial class MainViewModel : ObservableObject
         _arranger = arranger;
         _urlRetriever = urlRetriever;
         _syncManager = syncManager;
-        _appSettings = appSettings;
         _log = log;
-
-        SyncEnabled = _store.Data.Settings.SyncMinMax != 0;
-        ShowGuiOnStartup = _store.Data.Settings.ShowGuiOnStartup != 0;
-        ProfilesPathDisplay = _store.FilePath;
     }
 
     [RelayCommand]
@@ -520,96 +511,10 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    partial void OnSyncEnabledChanged(bool value)
-    {
-        _store.Data.Settings.SyncMinMax = value ? 1 : 0;
-        _store.Save();
-        _syncManager.UpdateHooksIfNeeded();
-        StatusText = $"連動設定: {(value ? "ON" : "OFF")}";
-    }
-
-    partial void OnShowGuiOnStartupChanged(bool value)
-    {
-        _store.Data.Settings.ShowGuiOnStartup = value ? 1 : 0;
-        _store.Save();
-        StatusText = $"起動時GUI表示: {(value ? "ON" : "OFF")}";
-    }
-
     public void Initialize()
     {
         ReloadProfiles();
         // Kick off async refresh (fire-and-forget on UI thread)
         _ = RefreshWindowsCommand.ExecuteAsync(null);
-    }
-
-    [RelayCommand]
-    private void BrowseProfilesPath()
-    {
-        var dlg = new OpenFileDialog
-        {
-            Title = "profiles.json の保存先を選択",
-            Filter = "JSONファイル|profiles.json|All files|*.*",
-            FileName = "profiles.json",
-            CheckFileExists = false,
-        };
-
-        // Set initial directory from current path
-        var currentDir = Path.GetDirectoryName(_store.FilePath);
-        if (!string.IsNullOrEmpty(currentDir) && Directory.Exists(currentDir))
-            dlg.InitialDirectory = currentDir;
-
-        if (dlg.ShowDialog() != true)
-            return;
-
-        var selectedPath = dlg.FileName;
-
-        // Ensure the filename is profiles.json
-        if (!Path.GetFileName(selectedPath).Equals("profiles.json", StringComparison.OrdinalIgnoreCase))
-            selectedPath = Path.Combine(Path.GetDirectoryName(selectedPath) ?? selectedPath, "profiles.json");
-
-        try
-        {
-            _appSettings.SetProfilesPath(selectedPath);
-            _store.ChangePath(selectedPath);
-            ProfilesPathDisplay = _store.FilePath;
-
-            SyncEnabled = _store.Data.Settings.SyncMinMax != 0;
-            ShowGuiOnStartup = _store.Data.Settings.ShowGuiOnStartup != 0;
-
-            ReloadProfiles();
-            _syncManager.ScheduleRebuild();
-            StatusText = $"保存先を変更しました: {selectedPath}";
-            _log.Information("Profiles path changed to {Path}", selectedPath);
-        }
-        catch (Exception ex)
-        {
-            _log.Error(ex, "BrowseProfilesPath failed");
-            StatusText = $"保存先の変更に失敗: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void ResetProfilesPath()
-    {
-        try
-        {
-            _appSettings.SetProfilesPath("");
-            var defaultPath = _appSettings.EffectiveProfilesPath;
-            _store.ChangePath(defaultPath);
-            ProfilesPathDisplay = _store.FilePath;
-
-            SyncEnabled = _store.Data.Settings.SyncMinMax != 0;
-            ShowGuiOnStartup = _store.Data.Settings.ShowGuiOnStartup != 0;
-
-            ReloadProfiles();
-            _syncManager.ScheduleRebuild();
-            StatusText = $"保存先を既定に戻しました: {defaultPath}";
-            _log.Information("Profiles path reset to default: {Path}", defaultPath);
-        }
-        catch (Exception ex)
-        {
-            _log.Error(ex, "ResetProfilesPath failed");
-            StatusText = $"既定へのリセットに失敗: {ex.Message}";
-        }
     }
 }

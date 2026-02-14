@@ -8,6 +8,11 @@ namespace WindowController.App;
 
 public partial class MainWindow : FluentWindow
 {
+    /// <summary>
+    /// Event raised when the settings button is clicked.
+    /// </summary>
+    public event EventHandler? SettingsRequested;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -18,6 +23,11 @@ public partial class MainWindow : FluentWindow
         // Hide instead of close (tray resident)
         e.Cancel = true;
         Hide();
+    }
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsRequested?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>

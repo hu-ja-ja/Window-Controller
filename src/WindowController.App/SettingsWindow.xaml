@@ -1,0 +1,251 @@
+<ui:FluentWindow x:Class="WindowController.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:WindowController.App"
+        mc:Ignorable="d"
+        Title="設定 - Window-Controller" Height="680" Width="900"
+        WindowStartupLocation="CenterScreen"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        Closing="Window_Closing"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <ui:FluentWindow.Resources>
+        <local:BoolToCapturingTextConverter x:Key="BoolToCapturingTextConverter"/>
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════ TitleBar ═══════════════ -->
+        <ui:TitleBar Grid.Row="0" Title="設定" ShowMaximize="False" ShowMinimize="False"/>
+
+        <!-- ═══════════════ Main Content ═══════════════ -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="24,0,24,16">
+
+                <!-- ═══════ Section 1 : General Settings ═══════ -->
+                <TextBlock Text="全般設定" Style="{StaticResource SectionHeader}"/>
+
+                <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <!-- Sync toggle row -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="連動機能を有効にする" FontSize="14"/>
+                                <TextBlock Text="最小化 / 最大化の連動を全体で有効にします"
+                                           Style="{StaticResource SettingDescription}"/>
+                            </StackPanel>
+                            <CheckBox Grid.Column="1" IsChecked="{Binding SyncEnabled}" VerticalAlignment="Center"
+                                      Style="{StaticResource AccentCheckBox}"/>
+                        </Grid>
+
+                        <Separator Margin="0,0,0,10" Opacity="0.3"/>
+
+                        <!-- Show GUI on startup row -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="起動時にGUIを表示する" FontSize="14"/>
+                                <TextBlock Text="OFFの場合はタスクトレイ常駐のみ"
+                                           Style="{StaticResource SettingDescription}"/>
+                            </StackPanel>
+                            <CheckBox Grid.Column="1" IsChecked="{Binding ShowGuiOnStartup}" VerticalAlignment="Center"
+                                      Style="{StaticResource AccentCheckBox}"/>
+                        </Grid>
+
+                        <Separator Margin="0,10,0,10" Opacity="0.3"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ui:Button Appearance="Secondary" Command="{Binding ResetGeneralSettingsCommand}">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="ArrowCounterclockwise24" />
+                                </ui:Button.Icon>
+                                <ui:Button.Content>
+                                    <TextBlock Text="既定に戻す"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ═══════ Section 2 : Profiles Path ═══════ -->
+                <TextBlock Text="プロファイルの保存先" Style="{StaticResource SectionHeader}"/>
+
+                <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding ProfilesPathDisplay, Mode=OneWay}"
+                                        IsReadOnly="True"
+                                        PlaceholderText="保存先パス"
+                                        ToolTip="{Binding ProfilesPathDisplay}"
+                                        Margin="0,0,8,0"/>
+                            <ui:Button Grid.Column="1" Appearance="Secondary" Command="{Binding BrowseProfilesPathCommand}" Margin="0,0,8,0">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="FolderOpen24" />
+                                </ui:Button.Icon>
+                                <ui:Button.Content>
+                                    <TextBlock Text="変更…"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+                            <ui:Button Grid.Column="2" Appearance="Secondary" Command="{Binding ResetProfilesPathCommand}">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="ArrowCounterclockwise24" />
+                                </ui:Button.Icon>
+                                <ui:Button.Content>
+                                    <TextBlock Text="既定に戻す"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ═══════ Section 3 : GUI Hotkey ═══════ -->
+                <TextBlock Text="GUI表示ホットキー" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="このキーでメインウィンドウを表示/非表示します" Style="{StaticResource SectionDescription}"/>
+
+                <Border Style="{StaticResource SectionCard}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,8,0">
+                            <TextBlock Text="{Binding GuiHotkeyDisplay}"
+                                       FontSize="14" FontWeight="Medium"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ui:Button Grid.Column="1" Appearance="Info" Command="{Binding CaptureGuiHotkeyCommand}"
+                                   Margin="0,0,8,0" MinWidth="80">
+                            <ui:Button.Content>
+                                <TextBlock Text="{Binding IsCapturingGuiHotkey, Converter={StaticResource BoolToCapturingTextConverter}}"/>
+                            </ui:Button.Content>
+                        </ui:Button>
+
+                        <ui:Button Grid.Column="2" Appearance="Secondary" Command="{Binding ClearGuiHotkeyCommand}">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="Dismiss24" />
+                            </ui:Button.Icon>
+                            <ui:Button.Content>
+                                <TextBlock Text="解除"/>
+                            </ui:Button.Content>
+                        </ui:Button>
+
+                        <ui:Button Grid.Column="3" Appearance="Secondary" Command="{Binding ResetGuiHotkeyToDefaultCommand}" Margin="8,0,0,0">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ArrowCounterclockwise24" />
+                            </ui:Button.Icon>
+                            <ui:Button.Content>
+                                <TextBlock Text="既定に戻す"/>
+                            </ui:Button.Content>
+                        </ui:Button>
+                    </Grid>
+                </Border>
+
+                <!-- ═══════ Section 4 : Profile Hotkeys ═══════ -->
+                <TextBlock Text="プロファイル適用ホットキー" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="プロファイルごとにホットキーを設定できます（配置のみ適用）" Style="{StaticResource SectionDescription}"/>
+
+                <Border Style="{StaticResource SectionCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Profile list -->
+                        <DataGrid Grid.Row="0"
+                                  x:Name="dgProfileHotkeys"
+                                  ItemsSource="{Binding ProfileHotkeys}"
+                                  SelectedItem="{Binding SelectedProfileHotkey}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="None"
+                                  MaxHeight="200"
+                                  BorderThickness="0"
+                                  Background="Transparent"
+                                  Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                  RowHeight="32"
+                                  RowStyle="{StaticResource RoundedRow}"
+                                  CellStyle="{StaticResource TransparentCell}"
+                                  Margin="0,0,0,10">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="プロファイル" Binding="{Binding ProfileName}" Width="*" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="ホットキー" Binding="{Binding HotkeyDisplay}" Width="150" IsReadOnly="True"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Hotkey edit buttons -->
+                        <StackPanel Grid.Row="1" Orientation="Horizontal">
+                            <ui:Button Appearance="Info" Command="{Binding CaptureProfileHotkeyCommand}"
+                                       Margin="0,0,8,0" MinWidth="80">
+                                <ui:Button.Content>
+                                    <TextBlock Text="{Binding IsCapturingProfileHotkey, Converter={StaticResource BoolToCapturingTextConverter}}"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+
+                            <ui:Button Appearance="Secondary" Command="{Binding ClearProfileHotkeyCommand}">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="Dismiss24" />
+                                </ui:Button.Icon>
+                                <ui:Button.Content>
+                                    <TextBlock Text="解除"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+
+                            <ui:Button Appearance="Secondary" Command="{Binding ResetAllProfileHotkeysCommand}" Margin="8,0,0,0">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="ArrowCounterclockwise24" />
+                                </ui:Button.Icon>
+                                <ui:Button.Content>
+                                    <TextBlock Text="既定に戻す"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ═══════════════ Status Bar ═══════════════ -->
+        <Border Grid.Row="2" Padding="24,6"
+                Background="{DynamicResource ControlFillColorDefaultBrush}"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

@@ -124,8 +124,10 @@ public static class NativeMethods
     public const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
 
     // Hotkey modifiers
-    public const uint MOD_CONTROL = 0x0002;
     public const uint MOD_ALT = 0x0001;
+    public const uint MOD_CONTROL = 0x0002;
+    public const uint MOD_SHIFT = 0x0004;
+    public const uint MOD_WIN = 0x0008;
     public const uint MOD_NOREPEAT = 0x4000;
     public const uint VK_W = 0x57;
 
