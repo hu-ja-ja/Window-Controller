@@ -4,6 +4,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="モニターを選択して配置"
         Width="440" SizeToContent="Height"
+    MinHeight="0"
         WindowStartupLocation="Manual"
         ResizeMode="NoResize"
         Topmost="True"
@@ -13,7 +14,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <ui:TitleBar Grid.Row="0" Title="モニターを選択して配置"
