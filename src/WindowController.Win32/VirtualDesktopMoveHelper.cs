@@ -145,7 +145,14 @@ internal static class VirtualDesktopMoveHelper
         };
         thread.SetApartmentState(ApartmentState.MTA);
         thread.Start();
-        thread.Join();
+
+        // Avoid blocking indefinitely in case the shell COM call hangs.
+        var completed = thread.Join(TimeSpan.FromSeconds(5));
+        if (!completed)
+        {
+            log.Warning("VDMoveHelper: MTA thread did not complete within the timeout; aborting move");
+            return false;
+        }
 
         if (threadEx != null)
             log.Warning(threadEx, "VDMoveHelper: MTA thread error");

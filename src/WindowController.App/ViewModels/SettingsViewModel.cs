@@ -41,7 +41,6 @@ public partial class SettingsViewModel : ObservableObject
 
     // Callback to refresh hotkeys after settings change
     private readonly Action? _refreshHotkeysCallback;
-    private readonly Func<string, bool, Task>? _applyProfileCallback;
 
     // ========== Existing settings from profiles.json ==========
     [ObservableProperty] private bool _syncEnabled;
@@ -68,8 +67,7 @@ public partial class SettingsViewModel : ObservableObject
         HotkeyManager hotkeyManager,
         SyncManager syncManager,
         ILogger log,
-        Action? refreshHotkeysCallback = null,
-        Func<string, bool, Task>? applyProfileCallback = null)
+        Action? refreshHotkeysCallback = null)
     {
         _profileStore = profileStore;
         _appSettingsStore = appSettingsStore;
@@ -77,7 +75,6 @@ public partial class SettingsViewModel : ObservableObject
         _syncManager = syncManager;
         _log = log;
         _refreshHotkeysCallback = refreshHotkeysCallback;
-        _applyProfileCallback = applyProfileCallback;
 
         LoadSettings();
     }

@@ -11,8 +11,13 @@ namespace WindowController.App;
 /// <summary>
 /// Result of a profile apply operation.
 /// </summary>
-public record ApplyResult(int Applied, int Total, List<string> Failures, List<string> Warnings)
+public record ApplyResult(int Applied, int Total, IReadOnlyList<string> Failures, IReadOnlyList<string> Warnings)
 {
+    public ApplyResult(int applied, int total, IReadOnlyList<string> failures)
+        : this(applied, total, failures, Array.Empty<string>())
+    {
+    }
+
     public bool Success => Failures.Count == 0;
 
     public string ToStatusMessage(string profileName)
@@ -34,20 +39,26 @@ public class ProfileApplier
     private readonly ProfileStore _store;
     private readonly WindowEnumerator _enumerator;
     private readonly WindowArranger _arranger;
-    private readonly SyncManager _syncManager;
-    private readonly VirtualDesktopService _vdService;
+    private readonly Action _scheduleRebuild;
     private readonly ILogger _log;
 
-    public ProfileApplier(ProfileStore store, WindowEnumerator enumerator,
-        WindowArranger arranger, SyncManager syncManager,
-        VirtualDesktopService vdService, ILogger log)
+    private readonly Func<List<WindowCandidate>> _candidatesProvider;
+
+    public ProfileApplier(
+        ProfileStore store,
+        WindowEnumerator enumerator,
+        WindowArranger arranger,
+        Action scheduleRebuild,
+        ILogger log,
+        Func<List<WindowCandidate>>? candidatesProvider = null)
     {
         _store = store;
         _enumerator = enumerator;
         _arranger = arranger;
-        _syncManager = syncManager;
-        _vdService = vdService;
+        _scheduleRebuild = scheduleRebuild;
         _log = log;
+
+        _candidatesProvider = candidatesProvider ?? GetCandidatesFromEnumerator;
     }
 
     /// <summary>
@@ -58,7 +69,7 @@ public class ProfileApplier
     {
         var profile = _store.FindById(profileId);
         if (profile == null)
-            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" }, new());
+            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" });
 
         return await ApplyProfileAsync(profile, launchMissing, appHwnd, targetMonitor, targetDesktopId);
     }
@@ -71,7 +82,7 @@ public class ProfileApplier
     {
         var profile = _store.FindByName(profileName);
         if (profile == null)
-            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" }, new());
+            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" });
 
         return await ApplyProfileAsync(profile, launchMissing, appHwnd, targetMonitor, targetDesktopId);
     }
@@ -79,11 +90,18 @@ public class ProfileApplier
     private async Task<ApplyResult> ApplyProfileAsync(Profile profile, bool launchMissing,
         nint appHwnd, MonitorData? targetMonitor = null, Guid? targetDesktopId = null)
     {
-        var settings = _store.Data.Settings;
-        var candidates = GetCandidates();
+        var candidates = _candidatesProvider();
         int applied = 0;
         var failures = new List<string>();
         var warnings = new List<string>();
+
+        if (appHwnd != 0 || targetDesktopId != null)
+        {
+            _log.Debug(
+            "ApplyProfileAsync called with appHwnd {AppHwnd} and targetDesktopId {TargetDesktopId}, but virtual-desktop-specific handling is not yet implemented.",
+            appHwnd,
+            targetDesktopId);
+        }
 
         foreach (var entry in profile.Windows)
         {
@@ -100,16 +118,6 @@ public class ProfileApplier
                 if (hwnd == 0 || !NativeMethods.IsWindow(hwnd))
                 {
                     failures.Add($"{entry.Match.Exe} | {entry.Match.Title} : 見つかりません");
-                    continue;
-                }
-
-                // --- Virtual Desktop handling (整備中のため無効化) ---
-                // クロスデスクトップ適用を許可しない場合は、別デスクトップ上のウィンドウをスキップする。
-                // ※デスクトップ移動/切り替えは実行しない。
-                var onCurrent = _vdService.IsWindowOnCurrentDesktop(hwnd);
-                if (onCurrent == false && !settings.AllowCrossDesktopApply)
-                {
-                    warnings.Add($"{entry.Match.Exe} | {entry.Match.Title} : 別デスクトップ — スキップ");
                     continue;
                 }
 
@@ -138,8 +146,8 @@ public class ProfileApplier
             }
         }
 
-        _syncManager.ScheduleRebuild();
-        return new ApplyResult(applied, profile.Windows.Count, failures, warnings);
+        _scheduleRebuild();
+    return new ApplyResult(applied, profile.Windows.Count, failures, warnings);
     }
 
     private async Task<nint> LaunchAndWaitAsync(WindowEntry entry, List<WindowCandidate> existingCandidates)
@@ -194,12 +202,12 @@ public class ProfileApplier
         }
 
         // Last resort: try matching again
-        var newCandidates = GetCandidates();
+        var newCandidates = _candidatesProvider();
         var match = WindowMatcher.FindBest(entry, newCandidates);
         return match?.Hwnd ?? 0;
     }
 
-    private List<WindowCandidate> GetCandidates()
+    private List<WindowCandidate> GetCandidatesFromEnumerator()
     {
         var wins = _enumerator.EnumerateWindows();
         return wins.Select(w => new WindowCandidate

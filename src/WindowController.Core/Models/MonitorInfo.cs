@@ -32,7 +32,7 @@ public class MonitorInfo
     public int PixelHeight { get; set; }
 
     /// <summary>
-    /// Aspect ratio (width / height). Computed helper — written for diagnostics.
+    /// Aspect ratio (width / height). Computed helper for in-memory diagnostics; not serialized.
     /// </summary>
     [JsonIgnore]
     public double AspectRatio => PixelHeight > 0 ? (double)PixelWidth / PixelHeight : 0;

@@ -74,6 +74,14 @@ public static class MonitorHelper
     public static MonitorData? GetMonitorForRect(int x, int y, int w, int h)
     {
         var monitors = GetMonitors();
+        return GetMonitorForRect(monitors, x, y, w, h);
+    }
+
+    /// <summary>
+    /// Find the monitor that contains the center of the given rect within an existing list.
+    /// </summary>
+    public static MonitorData? GetMonitorForRect(List<MonitorData> monitors, int x, int y, int w, int h)
+    {
         if (monitors.Count == 0) return null;
 
         int cx = x + w / 2;

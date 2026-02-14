@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowController.App", "Win
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowController.Core.Tests", "WindowController.Core.Tests\WindowController.Core.Tests.csproj", "{89485D59-7247-423B-8360-37C26780B5DD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowController.App.Tests", "WindowController.App.Tests\WindowController.App.Tests.csproj", "{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{89485D59-7247-423B-8360-37C26780B5DD}.Release|x64.Build.0 = Release|Any CPU
 		{89485D59-7247-423B-8360-37C26780B5DD}.Release|x86.ActiveCfg = Release|Any CPU
 		{89485D59-7247-423B-8360-37C26780B5DD}.Release|x86.Build.0 = Release|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Debug|x64.Build.0 = Debug|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Debug|x86.Build.0 = Debug|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Release|x64.ActiveCfg = Release|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Release|x64.Build.0 = Release|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Release|x86.ActiveCfg = Release|Any CPU
+		{D44D03B6-3E4B-4F8E-9DA0-7EEB24B7F4AF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
