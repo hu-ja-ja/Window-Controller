@@ -12,6 +12,8 @@ public class AppSettingsTests
 
         Assert.Equal("", settings.ProfilesPath);
         Assert.NotNull(settings.Hotkeys);
+        Assert.NotNull(settings.DefaultProfileIds);
+        Assert.Empty(settings.DefaultProfileIds);
     }
 
     [Fact]
@@ -90,6 +92,19 @@ public class AppSettingsTests
         Assert.NotNull(settings.Hotkeys);
         // Default hotkey should be applied
         Assert.Equal("W", settings.Hotkeys.ShowGui.Key);
+        Assert.NotNull(settings.DefaultProfileIds);
+        Assert.Empty(settings.DefaultProfileIds);
+    }
+
+    [Fact]
+    public void AppSettings_DeserializesWithMissingDefaultProfileIds_UsesEmptyList()
+    {
+        var json = """{ "profilesPath": "/some/path", "hotkeys": {} }""";
+        var settings = JsonSerializer.Deserialize<AppSettings>(json);
+
+        Assert.NotNull(settings);
+        Assert.NotNull(settings!.DefaultProfileIds);
+        Assert.Empty(settings.DefaultProfileIds);
     }
 
     [Fact]
@@ -108,6 +123,7 @@ public class AppSettingsTests
         var original = new AppSettings
         {
             ProfilesPath = "/custom/path/profiles.json",
+            DefaultProfileIds = new List<string> { "profile-a", "profile-b" },
             Hotkeys = new HotkeySettings
             {
                 ShowGui = new HotkeyBinding { Key = "G", Ctrl = true, Shift = true },
@@ -124,6 +140,8 @@ public class AppSettingsTests
 
         Assert.NotNull(deserialized);
         Assert.Equal(original.ProfilesPath, deserialized!.ProfilesPath);
+        Assert.NotNull(deserialized.DefaultProfileIds);
+        Assert.Equal(original.DefaultProfileIds, deserialized.DefaultProfileIds);
         Assert.Equal("G", deserialized.Hotkeys.ShowGui.Key);
         Assert.True(deserialized.Hotkeys.ShowGui.Ctrl);
         Assert.True(deserialized.Hotkeys.ShowGui.Shift);

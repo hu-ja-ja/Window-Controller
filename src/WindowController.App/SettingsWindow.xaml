@@ -169,7 +169,73 @@
                     </Grid>
                 </Border>
 
-                <!-- ═══════ Section 4 : Profile Hotkeys ═══════ -->
+                <!-- ═══════ Section 4 : Default Profiles ═══════ -->
+                <TextBlock Text="既定のプロファイル" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="タスクトレイの「既定のプロファイルを適用」で適用されるプロファイルを選択します" Style="{StaticResource SectionDescription}"/>
+
+                <Border Style="{StaticResource SectionCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <DataGrid Grid.Row="0"
+                                  ItemsSource="{Binding DefaultProfiles}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="None"
+                                  MaxHeight="200"
+                                  BorderThickness="0"
+                                  Background="Transparent"
+                                  Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                  RowHeight="32"
+                                  RowStyle="{StaticResource RoundedRow}"
+                                  CellStyle="{StaticResource TransparentCell}"
+                                  Margin="0,0,0,10">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="既定" Width="60" MinWidth="60">
+                                    <DataGridTemplateColumn.CellStyle>
+                                        <Style TargetType="DataGridCell">
+                                            <Setter Property="Padding" Value="2,0,0,0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderBrush" Value="Transparent"/>
+                                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                        </Style>
+                                    </DataGridTemplateColumn.CellStyle>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsDefault, UpdateSourceTrigger=PropertyChanged}"
+                                                      Style="{StaticResource AccentCheckBox}"
+                                                      HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="プロファイル" Binding="{Binding ProfileName}" Width="*" IsReadOnly="True"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ui:Button Appearance="Secondary" Command="{Binding ResetDefaultProfilesCommand}">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="ArrowCounterclockwise24" />
+                                </ui:Button.Icon>
+                                <ui:Button.Content>
+                                    <TextBlock Text="既定に戻す"/>
+                                </ui:Button.Content>
+                            </ui:Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ═══════ Section 5 : Profile Hotkeys ═══════ -->
                 <TextBlock Text="プロファイル適用ホットキー" Style="{StaticResource SectionHeader}"/>
                 <TextBlock Text="プロファイルごとにホットキーを設定できます（配置のみ適用）" Style="{StaticResource SectionDescription}"/>
 

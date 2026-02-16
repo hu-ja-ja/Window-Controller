@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -25,6 +26,16 @@ public partial class ProfileHotkeyItem : ObservableObject
     {
         HotkeyDisplay = Binding.IsEmpty ? "なし" : Binding.ToString();
     }
+}
+
+/// <summary>
+/// Represents a profile item for the default profiles list in settings UI.
+/// </summary>
+public partial class DefaultProfileItem : ObservableObject
+{
+    [ObservableProperty] private string _profileId = "";
+    [ObservableProperty] private string _profileName = "";
+    [ObservableProperty] private bool _isDefault;
 }
 
 /// <summary>
@@ -58,6 +69,9 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private ProfileHotkeyItem? _selectedProfileHotkey;
     [ObservableProperty] private bool _isCapturingProfileHotkey;
+
+    // ========== Default profiles settings ==========
+    public ObservableCollection<DefaultProfileItem> DefaultProfiles { get; } = new();
 
     [ObservableProperty] private string _statusText = "";
 
@@ -94,6 +108,9 @@ public partial class SettingsViewModel : ObservableObject
 
         // Load profile hotkeys
         LoadProfileHotkeys();
+
+        // Load default profiles
+        LoadDefaultProfiles();
     }
 
     // ========== Reset-to-default (per section) ==========
@@ -162,6 +179,78 @@ public partial class SettingsViewModel : ObservableObject
             item.UpdateDisplay();
             ProfileHotkeys.Add(item);
         }
+    }
+
+    private void LoadDefaultProfiles()
+    {
+        DefaultProfiles.Clear();
+
+        var defaultIds = _appSettingsStore.Data.DefaultProfileIds;
+
+        // Remove IDs that no longer exist in profiles.json to avoid leaving junk in appsettings.json.
+        var existingIds = _profileStore.Data.Profiles.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
+        var missingIds = defaultIds.Where(id => !existingIds.Contains(id)).ToList();
+        if (missingIds.Count > 0)
+        {
+            foreach (var id in missingIds)
+                defaultIds.Remove(id);
+            _appSettingsStore.Save();
+            _log.Information("Removed {Count} missing default profile ids from appsettings.json", missingIds.Count);
+        }
+
+        foreach (var profile in _profileStore.Data.Profiles)
+        {
+            var item = new DefaultProfileItem
+            {
+                ProfileId = profile.Id,
+                ProfileName = profile.Name,
+                IsDefault = defaultIds.Contains(profile.Id)
+            };
+            item.PropertyChanged += DefaultProfileItem_PropertyChanged;
+            DefaultProfiles.Add(item);
+        }
+
+        // Normalize apply order to match the UI display order.
+        PersistDefaultProfileIdsFromUiOrderIfChanged();
+    }
+
+    private void PersistDefaultProfileIdsFromUiOrderIfChanged()
+    {
+        var ids = _appSettingsStore.Data.DefaultProfileIds;
+        var normalized = DefaultProfiles.Where(p => p.IsDefault).Select(p => p.ProfileId).ToList();
+
+        if (ids.SequenceEqual(normalized, StringComparer.Ordinal))
+            return;
+
+        ids.Clear();
+        ids.AddRange(normalized);
+        _appSettingsStore.Save();
+    }
+
+    private void DefaultProfileItem_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(DefaultProfileItem.IsDefault)) return;
+        if (sender is not DefaultProfileItem item) return;
+
+        // Rebuild IDs from the current UI order to keep apply order stable.
+        PersistDefaultProfileIdsFromUiOrderIfChanged();
+        StatusText = item.IsDefault
+            ? $"「{item.ProfileName}」を既定プロファイルに追加しました"
+            : $"「{item.ProfileName}」を既定プロファイルから解除しました";
+    }
+
+    [RelayCommand]
+    private void ResetDefaultProfiles()
+    {
+        _appSettingsStore.Data.DefaultProfileIds.Clear();
+        _appSettingsStore.Save();
+        foreach (var item in DefaultProfiles)
+        {
+            item.PropertyChanged -= DefaultProfileItem_PropertyChanged;
+            item.IsDefault = false;
+            item.PropertyChanged += DefaultProfileItem_PropertyChanged;
+        }
+        StatusText = "既定プロファイルをクリアしました";
     }
 
     private void UpdateGuiHotkeyDisplay()
@@ -458,5 +547,6 @@ public partial class SettingsViewModel : ObservableObject
     public void RefreshProfiles()
     {
         LoadProfileHotkeys();
+        LoadDefaultProfiles();
     }
 }
