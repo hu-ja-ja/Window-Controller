@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -183,7 +184,20 @@ public partial class SettingsViewModel : ObservableObject
     private void LoadDefaultProfiles()
     {
         DefaultProfiles.Clear();
+
         var defaultIds = _appSettingsStore.Data.DefaultProfileIds;
+
+        // Remove IDs that no longer exist in profiles.json to avoid leaving junk in appsettings.json.
+        var existingIds = _profileStore.Data.Profiles.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
+        var missingIds = defaultIds.Where(id => !existingIds.Contains(id)).ToList();
+        if (missingIds.Count > 0)
+        {
+            foreach (var id in missingIds)
+                defaultIds.Remove(id);
+            _appSettingsStore.Save();
+            _log.Information("Removed {Count} missing default profile ids from appsettings.json", missingIds.Count);
+        }
+
         foreach (var profile in _profileStore.Data.Profiles)
         {
             var item = new DefaultProfileItem
@@ -195,6 +209,22 @@ public partial class SettingsViewModel : ObservableObject
             item.PropertyChanged += DefaultProfileItem_PropertyChanged;
             DefaultProfiles.Add(item);
         }
+
+        // Normalize apply order to match the UI display order.
+        PersistDefaultProfileIdsFromUiOrderIfChanged();
+    }
+
+    private void PersistDefaultProfileIdsFromUiOrderIfChanged()
+    {
+        var ids = _appSettingsStore.Data.DefaultProfileIds;
+        var normalized = DefaultProfiles.Where(p => p.IsDefault).Select(p => p.ProfileId).ToList();
+
+        if (ids.SequenceEqual(normalized, StringComparer.Ordinal))
+            return;
+
+        ids.Clear();
+        ids.AddRange(normalized);
+        _appSettingsStore.Save();
     }
 
     private void DefaultProfileItem_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -202,17 +232,8 @@ public partial class SettingsViewModel : ObservableObject
         if (e.PropertyName != nameof(DefaultProfileItem.IsDefault)) return;
         if (sender is not DefaultProfileItem item) return;
 
-        var ids = _appSettingsStore.Data.DefaultProfileIds;
-        if (item.IsDefault)
-        {
-            if (!ids.Contains(item.ProfileId))
-                ids.Add(item.ProfileId);
-        }
-        else
-        {
-            ids.Remove(item.ProfileId);
-        }
-        _appSettingsStore.Save();
+        // Rebuild IDs from the current UI order to keep apply order stable.
+        PersistDefaultProfileIdsFromUiOrderIfChanged();
         StatusText = item.IsDefault
             ? $"「{item.ProfileName}」を既定プロファイルに追加しました"
             : $"「{item.ProfileName}」を既定プロファイルから解除しました";

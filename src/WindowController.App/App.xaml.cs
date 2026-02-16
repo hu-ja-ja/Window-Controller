@@ -242,59 +242,68 @@ public partial class App : Application
 
     private async Task ApplyDefaultProfilesAsync()
     {
-        if (_profileApplier == null || _appSettingsStore == null || _profileStore == null)
-            return;
-
-        var defaultIds = _appSettingsStore.Data.DefaultProfileIds;
-        if (defaultIds.Count == 0)
+        try
         {
-            var shouldPopup = _mainWindow == null || !_mainWindow.IsVisible || _mainWindow.WindowState == WindowState.Minimized;
+            if (_profileApplier == null || _appSettingsStore == null || _profileStore == null)
+                return;
 
-            if (shouldPopup)
+            var defaultIds = _appSettingsStore.Data.DefaultProfileIds;
+            if (defaultIds.Count == 0)
             {
-                var dlg = new DefaultProfilesMissingDialog();
+                var shouldPopup = _mainWindow == null || !_mainWindow.IsVisible || _mainWindow.WindowState == WindowState.Minimized;
 
-                // WPF throws if Owner is set to a Window that has never been shown.
-                if (_mainWindow is { IsVisible: true })
+                if (shouldPopup)
                 {
-                    dlg.Owner = _mainWindow;
-                    dlg.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                }
-                else
-                {
-                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-                }
+                    var dlg = new DefaultProfilesMissingDialog();
 
-                var openSettings = dlg.ShowDialog() == true;
-                if (openSettings)
-                    ShowSettingsWindow();
+                    // WPF throws if Owner is set to a Window that has never been shown.
+                    if (_mainWindow is { IsVisible: true })
+                    {
+                        dlg.Owner = _mainWindow;
+                        dlg.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                    }
+                    else
+                    {
+                        dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                    }
+
+                    var openSettings = dlg.ShowDialog() == true;
+                    if (openSettings)
+                        ShowSettingsWindow();
+                }
+                else if (_viewModel != null)
+                {
+                    _viewModel.StatusText = "既定のプロファイルが設定されていません";
+                }
+                _log?.Information("No default profiles configured");
+                return;
             }
-            else if (_viewModel != null)
+
+            nint appHwnd = 0;
+            if (_mainWindow != null)
             {
-                _viewModel.StatusText = "既定のプロファイルが設定されていません";
+                var helper = new WindowInteropHelper(_mainWindow);
+                appHwnd = helper.Handle;
             }
-            _log?.Information("No default profiles configured");
-            return;
-        }
 
-        nint appHwnd = 0;
-        if (_mainWindow != null)
+            var messages = new List<string>();
+            foreach (var profileId in defaultIds)
+            {
+                var result = await _profileApplier.ApplyByIdAsync(profileId, false, appHwnd);
+                var profile = _profileStore.FindById(profileId);
+                var name = profile?.Name ?? profileId;
+                messages.Add(result.ToStatusMessage(name));
+            }
+
+            if (_viewModel != null)
+                _viewModel.StatusText = string.Join(" / ", messages);
+        }
+        catch (Exception ex)
         {
-            var helper = new WindowInteropHelper(_mainWindow);
-            appHwnd = helper.Handle;
+            _log?.Error(ex, "Failed to apply default profiles");
+            if (_viewModel != null)
+                _viewModel.StatusText = "既定のプロファイルの適用に失敗しました";
         }
-
-        var messages = new List<string>();
-        foreach (var profileId in defaultIds)
-        {
-            var result = await _profileApplier.ApplyByIdAsync(profileId, false, appHwnd);
-            var profile = _profileStore.FindById(profileId);
-            var name = profile?.Name ?? profileId;
-            messages.Add(result.ToStatusMessage(name));
-        }
-
-        if (_viewModel != null)
-            _viewModel.StatusText = string.Join(" / ", messages);
     }
 
     private void ShowSettingsWindow()
