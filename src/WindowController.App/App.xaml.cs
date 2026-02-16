@@ -217,9 +217,8 @@ public partial class App : Application
 
         contextMenu.Items.Add(new System.Windows.Controls.Separator());
 
-        var menuApply = new System.Windows.Controls.MenuItem { Header = "プロファイルを適用(配置のみ)" };
-        // TODO: Add submenu for profile selection if needed
-        menuApply.Click += (_, _) => ShowMainWindow();
+        var menuApply = new System.Windows.Controls.MenuItem { Header = "既定のプロファイルを適用" };
+        menuApply.Click += async (_, _) => await ApplyDefaultProfilesAsync();
         contextMenu.Items.Add(menuApply);
 
         contextMenu.Items.Add(new System.Windows.Controls.Separator());
@@ -239,6 +238,63 @@ public partial class App : Application
         _mainWindow.Show();
         _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Activate();
+    }
+
+    private async Task ApplyDefaultProfilesAsync()
+    {
+        if (_profileApplier == null || _appSettingsStore == null || _profileStore == null)
+            return;
+
+        var defaultIds = _appSettingsStore.Data.DefaultProfileIds;
+        if (defaultIds.Count == 0)
+        {
+            var shouldPopup = _mainWindow == null || !_mainWindow.IsVisible || _mainWindow.WindowState == WindowState.Minimized;
+
+            if (shouldPopup)
+            {
+                var dlg = new DefaultProfilesMissingDialog();
+
+                // WPF throws if Owner is set to a Window that has never been shown.
+                if (_mainWindow is { IsVisible: true })
+                {
+                    dlg.Owner = _mainWindow;
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                }
+                else
+                {
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                }
+
+                var openSettings = dlg.ShowDialog() == true;
+                if (openSettings)
+                    ShowSettingsWindow();
+            }
+            else if (_viewModel != null)
+            {
+                _viewModel.StatusText = "既定のプロファイルが設定されていません";
+            }
+            _log?.Information("No default profiles configured");
+            return;
+        }
+
+        nint appHwnd = 0;
+        if (_mainWindow != null)
+        {
+            var helper = new WindowInteropHelper(_mainWindow);
+            appHwnd = helper.Handle;
+        }
+
+        var messages = new List<string>();
+        foreach (var profileId in defaultIds)
+        {
+            var result = await _profileApplier.ApplyByIdAsync(profileId, false, appHwnd);
+            var profile = _profileStore.FindById(profileId);
+            var name = profile?.Name ?? profileId;
+            messages.Add(result.ToStatusMessage(name));
+        }
+
+        if (_viewModel != null)
+            _viewModel.StatusText = string.Join(" / ", messages);
     }
 
     private void ShowSettingsWindow()

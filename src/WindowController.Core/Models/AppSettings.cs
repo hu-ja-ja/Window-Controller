@@ -22,4 +22,11 @@ public class AppSettings
     /// </summary>
     [JsonPropertyName("hotkeys")]
     public HotkeySettings Hotkeys { get; set; } = new();
+
+    /// <summary>
+    /// Profile Ids to apply when "既定のプロファイルを適用" is executed.
+    /// Multiple profiles can be set and all will be applied in order.
+    /// </summary>
+    [JsonPropertyName("defaultProfileIds")]
+    public List<string> DefaultProfileIds { get; set; } = new();
 }
