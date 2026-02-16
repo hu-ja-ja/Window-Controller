@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Serilog;
+using WindowController.App;
 using WindowController.Core;
 using WindowController.Core.Models;
 
@@ -74,6 +75,15 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<DefaultProfileItem> DefaultProfiles { get; } = new();
 
     [ObservableProperty] private string _statusText = "";
+
+    // ========== About / Build info (read-only) ==========
+    public string AppInformationalVersion { get; } = AppBuildInfo.InformationalVersion;
+    public string AppFileVersion { get; } = AppBuildInfo.FileVersion;
+    public string AppAssemblyVersion { get; } = AppBuildInfo.AssemblyVersion;
+    public string BuildTimestampUtc { get; } = AppBuildInfo.GetMetadata("BuildTimestampUtc");
+    public string BuildConfiguration { get; } = AppBuildInfo.GetMetadata("BuildConfiguration");
+    public string BuildTargetFramework { get; } = AppBuildInfo.GetMetadata("BuildTargetFramework");
+    public string BuildRuntimeIdentifier { get; } = AppBuildInfo.GetMetadata("BuildRuntimeIdentifier", fallback: "(未指定)");
 
     public SettingsViewModel(
         ProfileStore profileStore,

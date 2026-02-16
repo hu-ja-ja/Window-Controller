@@ -307,6 +307,49 @@
                     </Grid>
                 </Border>
 
+                <!-- ═══════ Section 6 : About / Version Info ═══════ -->
+                <TextBlock Text="バージョン情報" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="不具合報告時などに参照してください（ビルド時に自動取得）" Style="{StaticResource SectionDescription}"/>
+
+                <Border Style="{StaticResource SectionCard}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Informational Version" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding AppInformationalVersion}" TextWrapping="Wrap"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="File Version" FontSize="14" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AppFileVersion}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Assembly Version" FontSize="14" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding AppAssemblyVersion}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Build Timestamp (UTC)" FontSize="14" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding BuildTimestampUtc}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Configuration" FontSize="14" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding BuildConfiguration}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Target Framework" FontSize="14" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding BuildTargetFramework}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Runtime Identifier" FontSize="14" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding BuildRuntimeIdentifier}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </Grid>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
 
