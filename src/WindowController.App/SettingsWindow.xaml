@@ -6,10 +6,12 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:local="clr-namespace:WindowController.App"
         mc:Ignorable="d"
-        Title="設定 - Window-Controller" Height="680" Width="900"
+        Title="設定 - Window-Controller" Height="680" Width="900" MinWidth="640"
         WindowStartupLocation="CenterScreen"
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         Closing="Window_Closing"
         PreviewKeyDown="Window_PreviewKeyDown">
 
@@ -197,6 +199,7 @@
                                   RowHeight="32"
                                   RowStyle="{StaticResource RoundedRow}"
                                   CellStyle="{StaticResource TransparentCell}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   Margin="0,0,0,10">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="既定" Width="60" MinWidth="60">
@@ -266,6 +269,7 @@
                                   RowHeight="32"
                                   RowStyle="{StaticResource RoundedRow}"
                                   CellStyle="{StaticResource TransparentCell}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   Margin="0,0,0,10">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="プロファイル" Binding="{Binding ProfileName}" Width="*" IsReadOnly="True"/>
