@@ -5,10 +5,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="Window-Controller" Height="800" Width="1140"
+        Title="Window-Controller" Height="800" Width="1140" MinWidth="720"
         WindowStartupLocation="CenterScreen"
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         Closing="Window_Closing">
 
     <Grid>
@@ -81,6 +83,7 @@
                                   RowHeight="32"
                                   RowStyle="{StaticResource RoundedRow}"
                                   CellStyle="{StaticResource TransparentCell}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   PreviewMouseWheel="DataGrid_PreviewMouseWheel"
                                   Margin="0,0,0,10">
                             <DataGrid.Columns>
@@ -169,6 +172,7 @@
                                   RowHeight="32"
                                   RowStyle="{StaticResource RoundedRow}"
                                   CellStyle="{StaticResource TransparentCell}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   PreviewMouseWheel="DataGrid_PreviewMouseWheel"
                                   Margin="0,0,0,10">
                             <DataGrid.ContextMenu>
