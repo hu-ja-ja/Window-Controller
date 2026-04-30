@@ -308,8 +308,26 @@
                 </Border>
 
                 <!-- ═══════ Section 6 : About / Version Info ═══════ -->
-                <TextBlock Text="バージョン情報" Style="{StaticResource SectionHeader}"/>
-                <TextBlock Text="不具合報告時などに参照してください（ビルド時に自動取得）" Style="{StaticResource SectionDescription}"/>
+                <Grid Margin="0,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="バージョン情報" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Text="不具合報告時などに参照してください（ビルド時に自動取得）" Style="{StaticResource SectionDescription}"/>
+                    </StackPanel>
+
+                    <ui:Button Grid.Column="1" Appearance="Transparent" Command="{Binding CopyVersionInfoCommand}" VerticalAlignment="Center">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="Copy20" />
+                        </ui:Button.Icon>
+                        <ui:Button.Content>
+                            <TextBlock Text="コピー" FontSize="12"/>
+                        </ui:Button.Content>
+                    </ui:Button>
+                </Grid>
 
                 <Border Style="{StaticResource SectionCard}">
                     <Grid>

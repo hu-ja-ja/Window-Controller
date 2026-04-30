@@ -551,6 +551,31 @@ public partial class SettingsViewModel : ObservableObject
         };
     }
 
+    [RelayCommand]
+    private void CopyVersionInfo()
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("[Window-Controller Version Info]");
+            sb.AppendLine($"Informational Version : {AppInformationalVersion}");
+            sb.AppendLine($"File Version          : {AppFileVersion}");
+            sb.AppendLine($"Assembly Version      : {AppAssemblyVersion}");
+            sb.AppendLine($"Build Timestamp (UTC) : {BuildTimestampUtc}");
+            sb.AppendLine($"Configuration         : {BuildConfiguration}");
+            sb.AppendLine($"Target Framework      : {BuildTargetFramework}");
+            sb.AppendLine($"Runtime Identifier    : {BuildRuntimeIdentifier}");
+
+            Clipboard.SetText(sb.ToString());
+            StatusText = "バージョン情報をクリップボードにコピーしました";
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Failed to copy version info to clipboard");
+            StatusText = "クリップボードへのコピーに失敗しました";
+        }
+    }
+
     /// <summary>
     /// Refresh the profile list (e.g., after profiles are added/removed in main window).
     /// </summary>
