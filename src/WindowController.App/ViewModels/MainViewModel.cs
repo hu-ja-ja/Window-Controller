@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using System.Windows.Interop;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -25,15 +24,12 @@ public partial class WindowItem : ObservableObject
     public string Url { get; init; } = "";
     public string BrowserProfile { get; init; } = "";
     public string CommandLine { get; init; } = "";
-    public int MinMax { get; init; }
-    public Core.Models.Rect Rect { get; init; } = new();
 }
 
 public partial class ProfileItem : ObservableObject
 {
     [ObservableProperty] private bool _syncMinMax;
     [ObservableProperty] private string _name = "";
-    [ObservableProperty] private string _targetDesktopLabel = "";
     public string Id { get; init; } = "";
     public int WindowCount { get; init; }
 }
@@ -45,7 +41,6 @@ public partial class MainViewModel : ObservableObject
     private readonly WindowArranger _arranger;
     private readonly BrowserUrlRetriever _urlRetriever;
     private readonly SyncManager _syncManager;
-    private readonly VirtualDesktopService _vdService;
     private readonly ProfileApplier _profileApplier;
     private readonly ILogger _log;
     private bool _isUpdatingProfileName;
@@ -59,7 +54,7 @@ public partial class MainViewModel : ObservableObject
 
     public MainViewModel(ProfileStore store, WindowEnumerator enumerator,
         WindowArranger arranger, BrowserUrlRetriever urlRetriever,
-        SyncManager syncManager, VirtualDesktopService vdService,
+        SyncManager syncManager,
         ProfileApplier profileApplier,
         AppSettingsStore appSettings, ILogger log)
     {
@@ -68,7 +63,6 @@ public partial class MainViewModel : ObservableObject
         _arranger = arranger;
         _urlRetriever = urlRetriever;
         _syncManager = syncManager;
-        _vdService = vdService;
         _profileApplier = profileApplier;
         _log = log;
     }
@@ -92,9 +86,7 @@ public partial class MainViewModel : ObservableObject
                     Path = w.Path,
                     Url = w.Url,
                     BrowserProfile = w.BrowserProfile,
-                    CommandLine = w.CommandLine,
-                    MinMax = w.MinMax,
-                    Rect = w.Rect
+                    CommandLine = w.CommandLine
                 });
             }
             StatusText = $"ウィンドウ一覧を更新しました（{wins.Count}件）";
@@ -222,12 +214,6 @@ public partial class MainViewModel : ObservableObject
                 }
             }
 
-            // --- Virtual Desktop Id ---
-            string? desktopId = null;
-            var dId = _vdService.GetWindowDesktopId(w.Hwnd);
-            if (dId.HasValue && dId.Value != Guid.Empty)
-                desktopId = dId.Value.ToString("D");
-
             return new WindowEntry
             {
                 Match = new MatchInfo
@@ -244,8 +230,7 @@ public partial class MainViewModel : ObservableObject
                 RectNormalized = rectNormalized,
                 MinMax = minMax,
                 Snap = snap,
-                Monitor = monitor,
-                DesktopId = desktopId
+                Monitor = monitor
             };
         }
         catch (Exception ex)
@@ -288,9 +273,7 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
-            var appHwnd = GetMainWindowHandle();
-
-            var result = await _profileApplier.ApplyByIdAsync(profileId, launchMissing, appHwnd);
+            var result = await _profileApplier.ApplyByIdAsync(profileId, launchMissing);
             StatusText = result.ToStatusMessage(profile.Name);
         }
         catch (Exception ex)
@@ -403,10 +386,8 @@ public partial class MainViewModel : ObservableObject
         // --- 適用 ---
         try
         {
-            var appHwnd = GetMainWindowHandle();
-
             var result = await _profileApplier.ApplyByIdAsync(
-                SelectedProfile.Id, false, appHwnd, selectedMonitor);
+                SelectedProfile.Id, false, selectedMonitor);
             StatusText = result.ToStatusMessage(profile.Name);
         }
         catch (Exception ex)
@@ -414,13 +395,6 @@ public partial class MainViewModel : ObservableObject
             _log.Error(ex, "ApplyToMonitor failed");
             StatusText = $"適用に失敗: {ex.Message}";
         }
-    }
-
-    [RelayCommand]
-    private Task ApplyToDesktopAndMonitor()
-    {
-        // 仮想デスクトップ関連は整備中のため、現時点では何もしない。
-        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -459,65 +433,6 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private void SetTargetDesktop()
-    {
-        if (SelectedProfile == null)
-        {
-            StatusText = "プロファイルを選択してください。";
-            return;
-        }
-
-        var appHwnd = GetMainWindowHandle();
-
-        var desktopId = _vdService.GetCurrentDesktopId(appHwnd);
-        if (!desktopId.HasValue || desktopId.Value == Guid.Empty)
-        {
-            StatusText = "現在のデスクトップIDを取得できませんでした。";
-            return;
-        }
-
-        var profile = _store.FindById(SelectedProfile.Id);
-        if (profile == null) return;
-
-        profile.TargetDesktopId = desktopId.Value.ToString("D");
-        _store.SaveProfile(profile);
-
-        SelectedProfile.TargetDesktopLabel = FormatDesktopLabel(profile.TargetDesktopId);
-        StatusText = $"ターゲットデスクトップを設定しました: {profile.Name}";
-    }
-
-    [RelayCommand]
-    private void ClearTargetDesktop()
-    {
-        if (SelectedProfile == null)
-        {
-            StatusText = "プロファイルを選択してください。";
-            return;
-        }
-
-        var profile = _store.FindById(SelectedProfile.Id);
-        if (profile == null) return;
-
-        profile.TargetDesktopId = null;
-        _store.SaveProfile(profile);
-
-        SelectedProfile.TargetDesktopLabel = "";
-        StatusText = $"ターゲットデスクトップを解除しました: {profile.Name}";
-    }
-
-    private static string FormatDesktopLabel(string? desktopId)
-        => desktopId ?? "";
-
-    private static nint GetMainWindowHandle()
-    {
-        if (Application.Current.MainWindow is not { } mainWindow)
-            return 0;
-
-        var helper = new WindowInteropHelper(mainWindow);
-        return helper.Handle;
-    }
-
     public void ReloadProfiles()
     {
         Profiles.Clear();
@@ -528,8 +443,7 @@ public partial class MainViewModel : ObservableObject
                 Id = p.Id,
                 Name = p.Name,
                 SyncMinMax = p.SyncMinMax != 0,
-                WindowCount = p.Windows.Count,
-                TargetDesktopLabel = FormatDesktopLabel(p.TargetDesktopId)
+                WindowCount = p.Windows.Count
             };
             item.PropertyChanged += (s, e) =>
             {

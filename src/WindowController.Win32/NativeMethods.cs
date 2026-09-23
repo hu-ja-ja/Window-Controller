@@ -32,19 +32,10 @@ public static class NativeMethods
     public static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
 
     [DllImport("user32.dll")]
-    public static extern bool GetWindowPlacement(nint hWnd, ref WINDOWPLACEMENT lpwndpl);
-
-    [DllImport("user32.dll")]
     public static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(nint hWnd, int nCmdShow);
-
-    [DllImport("user32.dll")]
-    public static extern nint GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    public static extern bool SetForegroundWindow(nint hWnd);
 
     [DllImport("user32.dll")]
     public static extern bool IsIconic(nint hWnd);
@@ -75,9 +66,6 @@ public static class NativeMethods
     public static extern bool UnhookWinEvent(nint hWinEventHook);
 
     [DllImport("user32.dll")]
-    public static extern bool MonitorFromWindow(nint hwnd, uint dwFlags);
-
-    [DllImport("user32.dll")]
     public static extern bool EnumDisplayMonitors(nint hdc, nint lprcClip,
         MonitorEnumProc lpfnEnum, nint dwData);
 
@@ -85,9 +73,6 @@ public static class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern bool GetMonitorInfoW(nint hMonitor, ref MONITORINFOEX lpmi);
-
-    [DllImport("user32.dll")]
-    public static extern nint MonitorFromRect(ref RECT lprc, uint dwFlags);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern nint OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
@@ -111,9 +96,7 @@ public static class NativeMethods
     public const int SW_MINIMIZE = 6;
     public const int SW_RESTORE = 9;
     public const int SW_MAXIMIZE = 3;
-    public const int SW_SHOWNORMAL = 1;
     public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
-    public const uint MONITOR_DEFAULTTONEAREST = 2;
 
     // WinEvent constants
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
@@ -129,35 +112,11 @@ public static class NativeMethods
     public const uint MOD_SHIFT = 0x0004;
     public const uint MOD_WIN = 0x0008;
     public const uint MOD_NOREPEAT = 0x4000;
-    public const uint VK_W = 0x57;
-
-    // DWM — cloaked detection (virtual desktop / store apps)
-    public const int DWMWA_CLOAKED = 14;
-
-    [DllImport("dwmapi.dll")]
-    public static extern int DwmGetWindowAttribute(nint hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
 
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {
         public int Left, Top, Right, Bottom;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct POINT
-    {
-        public int X, Y;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct WINDOWPLACEMENT
-    {
-        public uint length;
-        public uint flags;
-        public uint showCmd;
-        public POINT ptMinPosition;
-        public POINT ptMaxPosition;
-        public RECT rcNormalPosition;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

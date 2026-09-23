@@ -10,7 +10,6 @@ namespace WindowController.App;
 /// </summary>
 public class MonitorPickerItem
 {
-    public int Number { get; init; }
     public MonitorData MonitorData { get; init; } = null!;
     public string Label { get; init; } = "";
 }
@@ -35,7 +34,6 @@ public partial class MonitorPickerWindow : FluentWindow
 
         _items = monitors.Select((m, i) => new MonitorPickerItem
         {
-            Number = i + 1,
             MonitorData = m,
             Label = FormatLabel(i + 1, m)
         }).ToList();

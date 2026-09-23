@@ -129,14 +129,6 @@ public class ProfileStore
         Save();
     }
 
-    public bool DeleteProfile(string name)
-    {
-        var removed = Data.Profiles.RemoveAll(p => p.Name == name) > 0;
-        if (removed)
-            Save();
-        return removed;
-    }
-
     public bool DeleteProfileById(string id)
     {
         var removed = Data.Profiles.RemoveAll(p => p.Id == id) > 0;

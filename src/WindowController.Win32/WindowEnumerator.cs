@@ -21,8 +21,6 @@ public class WindowInfo
     public string Url { get; init; } = "";
     public string BrowserProfile { get; init; } = "";
     public string CommandLine { get; init; } = "";
-    public int MinMax { get; init; }
-    public Core.Models.Rect Rect { get; init; } = new();
 }
 
 /// <summary>
@@ -115,9 +113,6 @@ public class WindowEnumerator
                     }
                 }
 
-                var minMax = GetMinMax(hwnd);
-                var rect = GetWindowRect(hwnd);
-
                 results.Add(new WindowInfo
                 {
                     Hwnd = hwnd,
@@ -127,9 +122,7 @@ public class WindowEnumerator
                     Path = path,
                     Url = url,
                     BrowserProfile = browserProfile,
-                    CommandLine = cmdLine,
-                    MinMax = minMax,
-                    Rect = rect
+                    CommandLine = cmdLine
                 });
             }
             catch (Exception ex)

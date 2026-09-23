@@ -57,14 +57,6 @@ public class HotkeyManager : IDisposable
     }
 
     /// <summary>
-    /// Register the GUI toggle hotkey.
-    /// </summary>
-    public HotkeyRegistrationResult RegisterGuiHotkey(HotkeyBinding binding, Action callback)
-    {
-        return RegisterHotkey(HOTKEY_ID_GUI, binding, callback, "GUI");
-    }
-
-    /// <summary>
     /// Update the GUI toggle hotkey. Unregisters the old one first.
     /// </summary>
     public HotkeyRegistrationResult UpdateGuiHotkey(HotkeyBinding binding, Action callback)
@@ -97,18 +89,6 @@ public class HotkeyManager : IDisposable
             _profileHotkeyIds[profileId] = hotkeyId;
         }
         return result;
-    }
-
-    /// <summary>
-    /// Unregister a profile hotkey.
-    /// </summary>
-    public void UnregisterProfileHotkey(string profileId)
-    {
-        if (_profileHotkeyIds.TryGetValue(profileId, out var hotkeyId))
-        {
-            UnregisterHotkey(hotkeyId);
-            _profileHotkeyIds.Remove(profileId);
-        }
     }
 
     /// <summary>

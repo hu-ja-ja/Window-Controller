@@ -123,7 +123,6 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
       "syncMinMax": 0,
       "createdAt": "2026-01-01T20:20:20",
       "updatedAt": "2026-01-01T20:20:20",
-      "targetDesktopId": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
       "windows": [
         {
           "match": {
@@ -149,8 +148,7 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
             "devicePath": "\\\\?\\DISPLAY#...",
             "pixelWidth": 3840,
             "pixelHeight": 2160
-          },
-          "desktopId": "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"
+          }
         }
       ]
     }
@@ -160,9 +158,9 @@ GUI で起動中のウィンドウを一覧表示し、チェックしたウィ�
 
 > `id` はプロファイルの内部識別子(UUID)です。旧バージョンで作成された `profiles.json` に `id` がない場合や、`id` が重複している場合は起動時に自動で再付与されます。
 
-> JSON は `null` の項目を出力しません(例: `browser` / `snap` / `monitor` / `rectNormalized` / `desktopId` / `targetDesktopId` は状況により省略されます)。また `monitor.pixelWidth` / `monitor.pixelHeight` は 0 の場合は省略されます。
+> JSON は `null` の項目を出力しません(例: `browser` / `snap` / `monitor` / `rectNormalized` は状況により省略されます)。また `monitor.pixelWidth` / `monitor.pixelHeight` は 0 の場合は省略されます。
 
-> `desktopId` / `targetDesktopId` / `allowCrossDesktopApply` など仮想デスクトップ関連は将来拡張向けのフィールドで、GUI 上に「※整備中」と表示される機能は現状動作しない場合があります。
+> `allowCrossDesktopApply` は将来の仮想デスクトップ対応向けに予約されている設定です(現状の適用動作には影響しません)。
 
 ## ブラウザ URL 取得
 

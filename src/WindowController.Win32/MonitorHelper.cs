@@ -19,9 +19,6 @@ public class MonitorData
 
     /// <summary>Full monitor bounds (rcMonitor) as a WorkArea for convenience.</summary>
     public WorkArea MonitorRect { get; init; } = new(0, 0, 0, 0);
-
-    /// <summary>Aspect ratio (width / height). 0 if height is 0.</summary>
-    public double AspectRatio => PixelHeight > 0 ? (double)PixelWidth / PixelHeight : 0;
 }
 
 public static class MonitorHelper

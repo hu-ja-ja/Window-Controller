@@ -117,13 +117,12 @@ public class SyncManager : IDisposable
         }
     }
 
-    public void UpdateHooksIfNeeded(bool skipRebuild = false)
+    public void UpdateHooksIfNeeded()
     {
         if (_store.Data.Settings.SyncMinMax != 0 && HasAnySyncProfile())
         {
             _hookManager.Install();
-            if (!skipRebuild)
-                ScheduleRebuild();
+            ScheduleRebuild();
         }
         else
         {

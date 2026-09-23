@@ -31,26 +31,6 @@ public class ProfileApplierTests
     }
 
     [Fact]
-    public async Task ApplyByNameAsync_ProfileMissing_ReturnsFailure_AndDoesNotScheduleRebuild()
-    {
-        var log = Serilog.Core.Logger.None;
-        var storePath = CreateTempProfilesJson(new ProfilesRoot { Profiles = new() });
-        var store = new ProfileStore(storePath, log);
-        store.Load();
-
-        var scheduled = 0;
-        var applier = CreateApplier(store, log, scheduleRebuild: () => scheduled++);
-
-        var result = await applier.ApplyByNameAsync("missing", launchMissing: false);
-
-        Assert.Equal(0, result.Applied);
-        Assert.Equal(0, result.Total);
-        Assert.False(result.Success);
-        Assert.Contains("プロファイルが見つかりません", result.Failures);
-        Assert.Equal(0, scheduled);
-    }
-
-    [Fact]
     public async Task ApplyByIdAsync_InvalidWindowHandle_ReportsFailure_AndSchedulesRebuild()
     {
         var log = Serilog.Core.Logger.None;

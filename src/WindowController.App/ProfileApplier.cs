@@ -65,43 +65,22 @@ public class ProfileApplier
     /// Apply a profile by Id.
     /// </summary>
     public async Task<ApplyResult> ApplyByIdAsync(string profileId, bool launchMissing,
-        nint appHwnd = 0, MonitorData? targetMonitor = null, Guid? targetDesktopId = null)
+        MonitorData? targetMonitor = null)
     {
         var profile = _store.FindById(profileId);
         if (profile == null)
             return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" });
 
-        return await ApplyProfileAsync(profile, launchMissing, appHwnd, targetMonitor, targetDesktopId);
-    }
-
-    /// <summary>
-    /// Apply a profile by name.
-    /// </summary>
-    public async Task<ApplyResult> ApplyByNameAsync(string profileName, bool launchMissing,
-        nint appHwnd = 0, MonitorData? targetMonitor = null, Guid? targetDesktopId = null)
-    {
-        var profile = _store.FindByName(profileName);
-        if (profile == null)
-            return new ApplyResult(0, 0, new List<string> { "プロファイルが見つかりません" });
-
-        return await ApplyProfileAsync(profile, launchMissing, appHwnd, targetMonitor, targetDesktopId);
+        return await ApplyProfileAsync(profile, launchMissing, targetMonitor);
     }
 
     private async Task<ApplyResult> ApplyProfileAsync(Profile profile, bool launchMissing,
-        nint appHwnd, MonitorData? targetMonitor = null, Guid? targetDesktopId = null)
+        MonitorData? targetMonitor = null)
     {
         var candidates = _candidatesProvider();
         int applied = 0;
         var failures = new List<string>();
         var warnings = new List<string>();
-
-        if (appHwnd != 0 || targetDesktopId != null)
-        {
-            _log.Debug(
-            "ApplyProfileAsync called with appHwnd {AppHwnd} and targetDesktopId {TargetDesktopId}, but virtual-desktop-specific handling is not yet implemented.",
-            appHwnd,
-            targetDesktopId);
-        }
 
         foreach (var entry in profile.Windows)
         {

@@ -31,11 +31,4 @@ public class WindowEntry
     [JsonPropertyName("monitor")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MonitorInfo? Monitor { get; set; }
-
-    /// <summary>
-    /// Virtual Desktop GUID that owned this window at capture time.
-    /// </summary>
-    [JsonPropertyName("desktopId")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? DesktopId { get; set; }
 }
