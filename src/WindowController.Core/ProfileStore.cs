@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -156,7 +157,7 @@ public class ProfileStore
             return finalName;
 
         profile.Name = finalName;
-        profile.UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss");
+        profile.UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
         Save();
         return finalName;
     }

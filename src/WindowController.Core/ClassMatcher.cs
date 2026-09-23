@@ -5,7 +5,7 @@ namespace WindowController.Core;
 /// <summary>
 /// Class name matching logic (handles Avalonia-*, HwndWrapper[*, etc.)
 /// </summary>
-public static class ClassMatcher
+public static partial class ClassMatcher
 {
     /// <summary>
     /// Normalize a class name for storage/matching.
@@ -17,7 +17,7 @@ public static class ClassMatcher
             return "";
 
         // Avalonia-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx -> Avalonia-*
-        if (Regex.IsMatch(className, @"^Avalonia-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOptions.IgnoreCase))
+        if (AvaloniaGuidRegex().IsMatch(className))
             return "Avalonia-*";
 
         // HwndWrapper[...] -> HwndWrapper[*
@@ -48,4 +48,7 @@ public static class ClassMatcher
 
         return string.Equals(actual, expected, StringComparison.Ordinal);
     }
+
+    [GeneratedRegex(@"^Avalonia-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOptions.IgnoreCase)]
+    private static partial Regex AvaloniaGuidRegex();
 }

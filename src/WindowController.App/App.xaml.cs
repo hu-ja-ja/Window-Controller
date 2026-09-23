@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Windows;
@@ -60,6 +61,7 @@ public partial class App : Application
                 .WriteTo.File(logPath,
                     rollingInterval: RollingInterval.Infinite,
                     retainedFileCountLimit: null,
+                    formatProvider: CultureInfo.InvariantCulture,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss}  [{Level:u3}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             _log = Log.Logger;

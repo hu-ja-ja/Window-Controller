@@ -16,10 +16,10 @@ public static partial class UrlNormalizer
         if (string.IsNullOrWhiteSpace(url))
             return "";
 
-        var trimmed = Regex.Replace(url.Trim(), @"\s+", " ");
+        var trimmed = WhitespaceRegex().Replace(url.Trim(), " ");
 
         // Remove query and fragment
-        trimmed = Regex.Replace(trimmed, @"[#?].*$", "");
+        trimmed = QueryFragmentRegex().Replace(trimmed, "");
 
         // scheme://host/path
         var httpMatch = HttpUrlRegex().Match(trimmed);
@@ -55,6 +55,12 @@ public static partial class UrlNormalizer
         var m = HostRegex().Match(urlKey);
         return m.Success ? m.Groups[2].Value.ToLowerInvariant() : "";
     }
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRegex();
+
+    [GeneratedRegex(@"[#?].*$")]
+    private static partial Regex QueryFragmentRegex();
 
     [GeneratedRegex(@"^(https?|ws|wss|ftp)://([^/]+)(/.*)?$", RegexOptions.IgnoreCase)]
     private static partial Regex HttpUrlRegex();

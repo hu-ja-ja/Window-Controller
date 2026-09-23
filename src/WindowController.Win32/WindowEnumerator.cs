@@ -77,7 +77,7 @@ public class WindowEnumerator
                 if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0)
                     continue;
 
-                NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
+                _ = NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
                 var exe = GetProcessName(pid);
                 var cls = GetClassName(hwnd);
                 var path = GetProcessPath(pid);

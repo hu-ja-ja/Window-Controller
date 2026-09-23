@@ -1,0 +1,28 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+
+# xUnit convention: MethodName_State_ExpectedResult
+[WindowController.Core.Tests/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+
+[WindowController.App.Tests/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+
+# Win32 interop: names must match the native API; StringBuilder marshaling is the correct pattern here
+[WindowController.Win32/NativeMethods.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1838.severity = none
+
+# WPF Application lives for the process lifetime; disposal is handled in OnExit/ExitApp
+[WindowController.App/App.xaml.cs]
+dotnet_diagnostic.CA1001.severity = none

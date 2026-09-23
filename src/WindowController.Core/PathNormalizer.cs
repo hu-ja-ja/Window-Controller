@@ -17,7 +17,7 @@ public static class PathNormalizer
         }
 
         // UNC: \\\\server\\share -> \\server\share
-        if (path.StartsWith("\\\\"))
+        if (path.StartsWith("\\\\", StringComparison.Ordinal))
         {
             var tail = path.TrimStart('\\');
             return "\\\\" + NormalizeBackslashes(tail);
@@ -32,7 +32,7 @@ public static class PathNormalizer
     private static string NormalizeBackslashes(string value)
     {
         // Fast-path: no double backslash present
-        if (!value.Contains("\\\\"))
+        if (!value.Contains("\\\\", StringComparison.Ordinal))
             return value;
 
         var sb = new System.Text.StringBuilder(value.Length);

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -117,7 +118,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            var now = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss");
+            var now = DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
             var existing = _store.FindByName(name);
 
             var windowEntries = new List<WindowEntry>();
@@ -308,7 +309,7 @@ public partial class MainViewModel : ObservableObject
             {
                 var m = monitors[i];
                 var name = m.DeviceName;
-                if (name.StartsWith("\\\\.\\"))
+                if (name.StartsWith("\\\\.\\", StringComparison.Ordinal))
                     name = name.Substring(4);
                 var overlay = new MonitorOverlayWindow(
                     i + 1, $"{name}\n{m.PixelWidth}\u00d7{m.PixelHeight}",
@@ -369,7 +370,7 @@ public partial class MainViewModel : ObservableObject
         if (preWarnings.Count > 0)
         {
             var monName = selectedMonitor.DeviceName;
-            if (monName.StartsWith("\\\\.\\"))
+            if (monName.StartsWith("\\\\.\\", StringComparison.Ordinal))
                 monName = monName.Substring(4);
             var desc = $"配置先: {monName} ({selectedMonitor.PixelWidth}\u00d7{selectedMonitor.PixelHeight})";
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows.Input;
 using System.Windows.Interop;
 using Serilog;
@@ -300,7 +301,7 @@ public class HotkeyManager : IDisposable
         {
             Key.None => "",
             >= Key.A and <= Key.Z => key.ToString(),
-            >= Key.D0 and <= Key.D9 => ((int)key - (int)Key.D0).ToString(),
+            >= Key.D0 and <= Key.D9 => ((int)key - (int)Key.D0).ToString(CultureInfo.InvariantCulture),
             >= Key.NumPad0 and <= Key.NumPad9 => "NumPad" + ((int)key - (int)Key.NumPad0),
             >= Key.F1 and <= Key.F24 => key.ToString(),
             Key.Space => "Space",
@@ -326,6 +327,7 @@ public class HotkeyManager : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        GC.SuppressFinalize(this);
 
         lock (_gate)
         {

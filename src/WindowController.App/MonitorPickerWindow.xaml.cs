@@ -57,7 +57,7 @@ public partial class MonitorPickerWindow : FluentWindow
     private static string FormatLabel(int num, MonitorData m)
     {
         var name = m.DeviceName;
-        if (name.StartsWith(@"\\.\"))
+        if (name.StartsWith(@"\\.\", StringComparison.Ordinal))
             name = name.Substring(4);
         return $"{num}:  {name}  ({m.PixelWidth}\u00d7{m.PixelHeight})";
     }

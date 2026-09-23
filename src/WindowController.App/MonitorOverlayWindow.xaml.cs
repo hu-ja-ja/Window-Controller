@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Interop;
 using WindowController.Win32;
@@ -16,7 +17,7 @@ public partial class MonitorOverlayWindow : Window
         int monX, int monY, int monW, int monH)
     {
         InitializeComponent();
-        NumberText.Text = number.ToString();
+        NumberText.Text = number.ToString(CultureInfo.InvariantCulture);
         InfoText.Text = info;
         _monX = monX;
         _monY = monY;

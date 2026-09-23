@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -558,13 +559,13 @@ public partial class SettingsViewModel : ObservableObject
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("[Window-Controller Version Info]");
-            sb.AppendLine($"Informational Version : {AppInformationalVersion}");
-            sb.AppendLine($"File Version          : {AppFileVersion}");
-            sb.AppendLine($"Assembly Version      : {AppAssemblyVersion}");
-            sb.AppendLine($"Build Timestamp (UTC) : {BuildTimestampUtc}");
-            sb.AppendLine($"Configuration         : {BuildConfiguration}");
-            sb.AppendLine($"Target Framework      : {BuildTargetFramework}");
-            sb.AppendLine($"Runtime Identifier    : {BuildRuntimeIdentifier}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Informational Version : {AppInformationalVersion}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"File Version          : {AppFileVersion}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Assembly Version      : {AppAssemblyVersion}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Build Timestamp (UTC) : {BuildTimestampUtc}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Configuration         : {BuildConfiguration}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Target Framework      : {BuildTargetFramework}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Runtime Identifier    : {BuildRuntimeIdentifier}");
 
             Clipboard.SetText(sb.ToString());
             StatusText = "バージョン情報をクリップボードにコピーしました";

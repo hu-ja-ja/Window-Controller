@@ -126,7 +126,7 @@ public class ProfileApplier
         }
 
         _scheduleRebuild();
-    return new ApplyResult(applied, profile.Windows.Count, failures, warnings);
+        return new ApplyResult(applied, profile.Windows.Count, failures, warnings);
     }
 
     // Extensions blocked from being launched via UseShellExecute to prevent

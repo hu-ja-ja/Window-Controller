@@ -5,8 +5,9 @@ namespace WindowController.Win32;
 
 /// <summary>
 /// Raw P/Invoke declarations for Win32 APIs.
+/// Internal: consumed within this solution only (see InternalsVisibleTo).
 /// </summary>
-public static class NativeMethods
+internal static class NativeMethods
 {
     public delegate bool EnumWindowsProc(nint hwnd, nint lParam);
 

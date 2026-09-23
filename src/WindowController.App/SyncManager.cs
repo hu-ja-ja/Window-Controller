@@ -346,6 +346,13 @@ public class SyncManager : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        GC.SuppressFinalize(this);
+        lock (_rebuildLock)
+        {
+            _rebuildCts?.Cancel();
+            _rebuildCts?.Dispose();
+            _rebuildCts = null;
+        }
         _hookManager.EventReceived -= OnWinEvent;
         _hookManager.Dispose();
     }

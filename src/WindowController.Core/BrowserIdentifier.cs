@@ -55,6 +55,8 @@ public static partial class BrowserIdentifier
         return null;
     }
 
+    private static readonly TimeSpan CmdArgRegexTimeout = TimeSpan.FromMilliseconds(100);
+
     private static string TryGetCmdArg(string cmd, string key)
     {
         if (string.IsNullOrEmpty(cmd))
@@ -62,13 +64,13 @@ public static partial class BrowserIdentifier
 
         // --key="value" or --key=value
         var pattern1 = $@"(?:^|\s)({Regex.Escape(key)})=(""[^""]+""|\S+)";
-        var m1 = Regex.Match(cmd, pattern1, RegexOptions.IgnoreCase);
+        var m1 = Regex.Match(cmd, pattern1, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, CmdArgRegexTimeout);
         if (m1.Success)
             return m1.Groups[2].Value.Trim('"');
 
         // --key "value" or --key value
         var pattern2 = $@"(?:^|\s)({Regex.Escape(key)})\s+(""[^""]+""|\S+)";
-        var m2 = Regex.Match(cmd, pattern2, RegexOptions.IgnoreCase);
+        var m2 = Regex.Match(cmd, pattern2, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, CmdArgRegexTimeout);
         if (m2.Success)
             return m2.Groups[2].Value.Trim('"');
 

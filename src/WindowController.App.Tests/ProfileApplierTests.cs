@@ -10,6 +10,12 @@ namespace WindowController.App.Tests;
 
 public class ProfileApplierTests
 {
+    private static readonly System.Text.Json.JsonSerializerOptions TestJsonOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = null
+    };
     [Fact]
     public async Task ApplyByIdAsync_ProfileMissing_ReturnsFailure_AndDoesNotScheduleRebuild()
     {
@@ -110,12 +116,7 @@ public class ProfileApplierTests
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "profiles.json");
 
-        var json = System.Text.Json.JsonSerializer.Serialize(root, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = null
-        });
+        var json = System.Text.Json.JsonSerializer.Serialize(root, TestJsonOptions);
 
         File.WriteAllText(path, json);
         return path;

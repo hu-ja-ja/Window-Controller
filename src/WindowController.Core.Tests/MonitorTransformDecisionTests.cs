@@ -89,7 +89,7 @@ public class MonitorTransformDecisionTests
         var result = MonitorTransformDecision.Evaluate(saved, 3840, 2160, isExactMonitorMatch: true, DefaultSettings);
 
         Assert.Equal(MonitorTransformLevel.Warn, result.Level);
-        Assert.Contains(result.Reasons, r => r.Message.Contains("解像度"));
+        Assert.Contains(result.Reasons, r => r.Message.Contains("解像度", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class MonitorTransformDecisionTests
         var result = MonitorTransformDecision.Evaluate(saved, 2560, 1080, isExactMonitorMatch: false, DefaultSettings);
 
         Assert.Equal(MonitorTransformLevel.Warn, result.Level);
-        Assert.Contains(result.Reasons, r => r.Message.Contains("アスペクト比"));
+        Assert.Contains(result.Reasons, r => r.Message.Contains("アスペクト比", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class MonitorTransformDecisionTests
         var result = MonitorTransformDecision.Evaluate(saved, 1921, 1080, isExactMonitorMatch: true, DefaultSettings);
 
         // Should warn about resolution mismatch but NOT aspect ratio
-        Assert.DoesNotContain(result.Reasons, r => r.Message.Contains("アスペクト比"));
+        Assert.DoesNotContain(result.Reasons, r => r.Message.Contains("アスペクト比", StringComparison.Ordinal));
     }
 
     // ────────── Warn: monitor fallback ──────────
@@ -138,7 +138,7 @@ public class MonitorTransformDecisionTests
         var result = MonitorTransformDecision.Evaluate(saved, 1920, 1080, isExactMonitorMatch: false, DefaultSettings);
 
         Assert.Equal(MonitorTransformLevel.Warn, result.Level);
-        Assert.Contains(result.Reasons, r => r.Message.Contains("別のモニタ"));
+        Assert.Contains(result.Reasons, r => r.Message.Contains("別のモニタ", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -163,8 +163,8 @@ public class MonitorTransformDecisionTests
 
         Assert.Equal(MonitorTransformLevel.Warn, result.Level);
         // Should have both resolution warning and monitor fallback warning
-        Assert.Contains(result.Reasons, r => r.Message.Contains("解像度"));
-        Assert.Contains(result.Reasons, r => r.Message.Contains("別のモニタ"));
+        Assert.Contains(result.Reasons, r => r.Message.Contains("解像度", StringComparison.Ordinal));
+        Assert.Contains(result.Reasons, r => r.Message.Contains("別のモニタ", StringComparison.Ordinal));
     }
 
     // ────────── Conversion table from plan ──────────

@@ -76,6 +76,7 @@ public class WinEventHookManager : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        GC.SuppressFinalize(this);
         Uninstall();
     }
 }
