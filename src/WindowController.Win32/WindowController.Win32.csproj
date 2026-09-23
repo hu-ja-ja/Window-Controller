@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Authors>hu-ja-ja</Authors>
@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.3.1" />
-    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.Management" Version="10.0.12" />
     <ProjectReference Include="..\WindowController.Core\WindowController.Core.csproj" />
   </ItemGroup>
 

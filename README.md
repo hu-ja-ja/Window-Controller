@@ -181,7 +181,7 @@ dotnet run --project WindowController.App
 
 # 公開用ビルド(単一ファイル・自己完結型)
 dotnet publish WindowController.App -c Release
-# 出力先: src/WindowController.App/bin/Release/net8.0-windows/win-x64/publish/
+# 出力先: src/WindowController.App/bin/Release/net10.0-windows/win-x64/publish/
 ```
 
 ## 配布用ZIPの生成
@@ -197,7 +197,7 @@ pwsh scripts/package.ps1
 
 ### 必要環境
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 以上
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) 以上
 - Windows 10 / 11
 
 ### プロジェクト構成
@@ -213,7 +213,7 @@ src/
 
 ### 技術スタック
 
-- .NET 8 / WPF
+- .NET 10 / WPF
 - CommunityToolkit.Mvvm
 - FlaUI.UIA3 (UI Automation)
 - Serilog (Logging)
