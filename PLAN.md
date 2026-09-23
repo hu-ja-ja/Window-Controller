@@ -5,9 +5,9 @@
 > **決定事項**: 仮想デスクトップ(VD)機能は完成させず `feature/virtual-desktop` ブランチへ退避。
 > 優先順位は ①VD 退避 + 掃除 → ②.NET 10 移行 → ③(延期)パッケージ メジャー更新。
 >
-> **進捗**: ✅ Step 1(VD 退避)・Step 2(置き去りコード削除)・Step 3(.NET 10 移行) 完了。
+> **進捗**: ✅ Step 1(VD 退避)・Step 2(置き去りコード削除)・Step 3(.NET 10 移行)・Step 4(パッケージ更新) 完了。
 > `feature/virtual-desktop` ブランチは Step 1 着手前の dev(660cf32)から作成済み。
-> 残りは Step 4(延期可)。
+> 残りは任意の掃除のみ。そのファイルを触るついでにやる。
 
 ## 前提
 
@@ -108,10 +108,12 @@ Step 1 とは別コミットにする(レビューしやすさ優先)。
 
 ---
 
-## Step 4: 延期項目(期限なし)
+## Step 4: 延期項目(期限なし) ✅完了(2026-09-23)
 
-- パッケージ更新(低リスク組を一括): CommunityToolkit.Mvvm 8.4.2 / Serilog 4.4.0 / WPF-UI 4.3.0
-- メジャー更新は1つずつ、それぞれスモーク付き: FlaUI.UIA3 5.0.0 → Hardcodet.NotifyIcon.Wpf 2.0.1
+- パッケージ更新(低リスク組を一括): CommunityToolkit.Mvvm 8.4.2 / Serilog 4.4.0 / WPF-UI 4.3.0 ✅
+- メジャー更新は1つずつ、それぞれスモーク付き: FlaUI.UIA3 5.0.0 ✅ → Hardcodet.NotifyIcon.Wpf 2.0.1 ✅
+  - いずれも破壊的変更なし(build + test 緑)。FlaUI 5 で NU1904(System.Drawing.Common 脆弱性警告)も解消
+  - 起動スモークは本番インスタンスの Mutex により二重起動ブロック止まりのため、トレイ生成(Hardcodet 経路)の実動作確認は次回再起動時に目視すること
 - 任意の掃除(そのファイルを触るついで): JSON 定型の共通化、`SettingsViewModel` のパス変更2メソッド重複、`App.ExitApp` / `OnExit` の二重 Dispose、`package.ps1` の XML パース簡略化
 
 ---

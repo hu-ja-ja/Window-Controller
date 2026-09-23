@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Serilog" Version="4.3.1" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="System.Management" Version="10.0.12" />
     <ProjectReference Include="..\WindowController.Core\WindowController.Core.csproj" />
   </ItemGroup>
